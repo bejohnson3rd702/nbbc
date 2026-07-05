@@ -29,3 +29,8 @@ giving.json
 sms_messages.json
 sermons.json
 sermons/
+
+# macOS metadata files
+._*
+**/._*
+.DS_Store
