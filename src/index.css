@@ -1,0 +1,603 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Sanctuary Theme Colors (Midnight Blue and Warm Antique Gold) */
+  --bg-main: #0b0f19;
+  --bg-card: rgba(22, 28, 45, 0.65);
+  --bg-card-hover: rgba(28, 36, 58, 0.85);
+  --border-color: rgba(217, 119, 6, 0.15);
+  --border-focus: rgba(217, 119, 6, 0.4);
+  
+  --primary-gold: #e2a850;
+  --primary-gold-hover: #f3c27a;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-gold: #f59e0b;
+  
+  --status-live: #ef4444;
+  --status-live-pulse: rgba(239, 68, 68, 0.3);
+  
+  --font-serif: 'Cinzel', Georgia, serif;
+  --font-sans: 'Inter', sans-serif;
+  
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-gold);
+}
+
+/* Glassmorphism containers */
+.glass-panel {
+  background: rgba(18, 24, 38, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 168, 80, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  transition: var(--transition-smooth);
+}
+
+.glass-panel:hover {
+  border-color: rgba(226, 168, 80, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(226, 168, 80, 0.08);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  text-decoration: none;
+  font-family: var(--font-sans);
+  border: 1px solid transparent;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-gold) 0%, #b45309 100%);
+  color: #0b0f19;
+  border: none;
+  box-shadow: 0 4px 14px rgba(226, 168, 80, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--primary-gold-hover) 0%, #d97706 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(226, 168, 80, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(226, 168, 80, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: white;
+  border-color: transparent;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+}
+
+/* Inputs */
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  transition: var(--transition-smooth);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+}
+
+/* Main Layout & Auth view styles */
+.auth-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: radial-gradient(circle at top, rgba(22, 28, 45, 0.8) 0%, rgba(11, 15, 25, 1) 70%);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 40px;
+  border: 1px solid rgba(226, 168, 80, 0.15);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(226, 168, 80, 0.05);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-title {
+  font-family: var(--font-serif);
+  color: var(--primary-gold);
+  font-size: 2.2rem;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.auth-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.auth-tabs {
+  display: flex;
+  margin-bottom: 24px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: var(--transition-smooth);
+}
+
+.auth-tab.active {
+  background: rgba(226, 168, 80, 0.15);
+  color: var(--primary-gold);
+  border: 1px solid rgba(226, 168, 80, 0.25);
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* Floating Reactions */
+.reactions-container {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 100px;
+  height: 400px;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.floating-reaction {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  font-size: 2.5rem;
+  animation: floatUp 3.5s cubic-bezier(0.08, 0.8, 0.58, 1) forwards;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translate(-50%, 0) scale(0.5);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+    transform: translate(-50%, -20px) scale(1.2);
+  }
+  100% {
+    transform: translate(calc(-50% + var(--random-x, 0px)), -380px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* Pulsing red live badge */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--status-live);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 var(--status-live-pulse);
+  animation: pulseLive 1.5s infinite;
+}
+
+@keyframes pulseLive {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 var(--status-live-pulse);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/* Main Dashboard styles */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 300px;
+  }
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.sidebar {
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(15, 22, 38, 0.95);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Video Stage */
+.video-stage {
+  position: relative;
+  flex: 1;
+  background: #020617;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.9);
+  border: 1px solid var(--border-color);
+}
+
+.stream-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-overlay-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px;
+  background: linear-gradient(to top, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0) 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.video-overlay-bottom > * {
+  pointer-events: auto;
+}
+
+/* Chat Styles */
+.chat-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  align-self: flex-start;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.chat-bubble.pastor {
+  border-left: 3px solid var(--primary-gold);
+  border-top-color: rgba(226, 168, 80, 0.1);
+  border-right-color: rgba(226, 168, 80, 0.1);
+  border-bottom-color: rgba(226, 168, 80, 0.1);
+  background: linear-gradient(135deg, rgba(226, 168, 80, 0.08) 0%, rgba(15, 23, 42, 0.35) 100%);
+}
+
+.chat-bubble.system {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  font-style: italic;
+  font-size: 0.85rem;
+  align-self: center;
+  max-width: 95%;
+  color: var(--text-muted);
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-bottom: 4px;
+  gap: 10px;
+}
+
+.chat-sender {
+  font-weight: 600;
+  color: var(--primary-gold);
+}
+
+.chat-bubble.pastor .chat-sender {
+  color: #fbbf24;
+}
+
+.chat-time {
+  color: var(--text-muted);
+}
+
+.chat-text {
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+/* Participant Grid */
+.participant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.participant-card {
+  position: relative;
+  aspect-ratio: 16/10;
+  background: #0f172a;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.participant-card.streaming {
+  border-color: var(--primary-gold);
+}
+
+.participant-avatar-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
+  gap: 8px;
+}
+
+.participant-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-gold) 0%, #b45309 100%);
+  color: #0b0f19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.participant-name {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.participant-indicators {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+}
+
+/* Tabs */
+.sidebar-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 5px;
+  margin: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  gap: 4px;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: var(--transition-smooth);
+}
+
+.sidebar-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-tab.active {
+  background: rgba(226, 168, 80, 0.15);
+  color: var(--primary-gold);
+  border: 1px solid rgba(226, 168, 80, 0.2);
+}
+
+/* Prayer Request Wall */
+.prayer-requests {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.prayer-card {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.prayer-meta {
+  font-size: 0.75rem;
+  color: var(--primary-gold);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.prayer-text {
+  font-size: 0.85rem;
+}
+
+/* Notification banner */
+.welcome-banner {
+  padding: 20px;
+  text-align: center;
+}
+
+.welcome-title {
+  font-family: var(--font-serif);
+  color: var(--primary-gold);
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.welcome-text {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Translucent Spinning Church Logo Medallion (Spins like a coin on Y-axis) */
+.logo-spin {
+  animation: coin-spin 6s linear infinite;
+  opacity: 0.8;
+  transform-style: preserve-3d;
+}
+
+@keyframes coin-spin {
+  0% {
+    transform: perspective(600px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(600px) rotateY(360deg);
+  }
+}
