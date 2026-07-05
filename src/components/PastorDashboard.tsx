@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Send, Users, 
-  LogOut, Radio, Hand, Sparkles
+  LogOut, Radio, Hand, Sparkles, BookOpen
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface MemberStatus {
   email: string;
@@ -88,16 +89,36 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
 
   const fetchSMSHistory = async () => {
     setLoadingSMSHistory(true);
-    try {
-      const response = await fetch('http://localhost:3001/api/sms-history');
-      if (response.ok) {
-        const data = await response.json();
-        setSmsHistory(data);
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const isSupabaseConfigured = !!(url && anonKey && 
+                                 !url.includes('placeholder-project') && 
+                                 !anonKey.includes('placeholder-anon-key'));
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('sms_messages')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        setSmsHistory(data || []);
+      } catch (e) {
+        console.error('Error fetching SMS history from Supabase:', e);
+      } finally {
+        setLoadingSMSHistory(false);
       }
-    } catch (e) {
-      console.error('Error fetching SMS history:', e);
-    } finally {
-      setLoadingSMSHistory(false);
+    } else {
+      try {
+        const response = await fetch('http://localhost:3001/api/sms-history');
+        if (response.ok) {
+          const data = await response.json();
+          setSmsHistory(data);
+        }
+      } catch (e) {
+        console.error('Error fetching SMS history locally:', e);
+      } finally {
+        setLoadingSMSHistory(false);
+      }
     }
   };
 
@@ -110,21 +131,65 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     setSmsSuccess(false);
 
     try {
-      const response = await fetch('http://localhost:3001/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: smsMessage.trim() })
-      });
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const isSupabaseConfigured = !!(url && anonKey && 
+                                   !url.includes('placeholder-project') && 
+                                   !anonKey.includes('placeholder-anon-key'));
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send broadcast');
+      if (isSupabaseConfigured) {
+        const { data: membersList, error: fetchError } = await supabase
+          .from('users')
+          .select('name, phone')
+          .eq('role', 'member')
+          .not('phone', 'is', null);
+
+        if (fetchError) throw fetchError;
+        
+        const filteredMembers = (membersList || []).filter(m => m.phone && m.phone.trim() !== '');
+        const recipientCount = filteredMembers.length;
+        const recipientsList = filteredMembers;
+
+        console.log(`\n--- 📱 MOCK SMS BROADCAST GATEWAY (SUPABASE) ---`);
+        console.log(`Message: "${smsMessage.trim()}"`);
+        console.log(`Sending to ${recipientCount} recipients:`);
+        filteredMembers.forEach(member => {
+          console.log(`  -> Sent to ${member.name} (${member.phone})`);
+        });
+        console.log(`------------------------------------\n`);
+
+        const smsRecord = {
+          message: smsMessage.trim(),
+          recipient_count: recipientCount,
+          recipients: recipientsList,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: new Date().toLocaleDateString()
+        };
+
+        const { error: insertError } = await supabase.from('sms_messages').insert(smsRecord);
+        if (insertError) throw insertError;
+
+        setSmsSuccess(true);
+        setSmsMessage('');
+        fetchSMSHistory();
+        setTimeout(() => setSmsSuccess(false), 5000);
+      } else {
+        const response = await fetch('http://localhost:3001/api/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: smsMessage.trim() })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send broadcast');
+        }
+
+        setSmsSuccess(true);
+        setSmsMessage('');
+        fetchSMSHistory();
+        setTimeout(() => setSmsSuccess(false), 5000);
       }
-
-      setSmsSuccess(true);
-      setSmsMessage('');
-      fetchSMSHistory();
-      setTimeout(() => setSmsSuccess(false), 5000);
     } catch (err: any) {
       setSmsError(err.message || 'Connection failed.');
     } finally {
@@ -248,19 +313,55 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     setUploadSuccess(false);
 
     try {
-      const response = await fetch('http://localhost:3001/api/upload-sermon', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'video/webm',
-          'X-Sermon-Title': encodeURIComponent(sermonTitle.trim()),
-          'X-Sermon-Date': new Date().toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })
-        },
-        body: sermonBlob
-      });
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const isSupabaseConfigured = !!(url && anonKey && 
+                                   !url.includes('placeholder-project') && 
+                                   !anonKey.includes('placeholder-anon-key'));
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Upload failed');
+      if (isSupabaseConfigured) {
+        const filename = `sermon_${Date.now()}.webm`;
+        
+        // 1. Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('sermons')
+          .upload(filename, sermonBlob, {
+            contentType: 'video/webm',
+            cacheControl: '3600'
+          });
+
+        if (uploadError) throw uploadError;
+
+        // 2. Get Public URL
+        const { data: urlData } = supabase.storage
+          .from('sermons')
+          .getPublicUrl(filename);
+
+        const videoUrl = urlData.publicUrl;
+
+        // 3. Save DB Record
+        const { error: dbError } = await supabase.from('sermons').insert({
+          title: sermonTitle.trim(),
+          date: new Date().toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }),
+          video_url: videoUrl
+        });
+
+        if (dbError) throw dbError;
+      } else {
+        const response = await fetch('http://localhost:3001/api/upload-sermon', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'video/webm',
+            'X-Sermon-Title': encodeURIComponent(sermonTitle.trim()),
+            'X-Sermon-Date': new Date().toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })
+          },
+          body: sermonBlob
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Upload failed');
+        }
       }
 
       setUploadSuccess(true);
@@ -496,15 +597,25 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
           )}
 
           {serviceStatus === 'live' && (
-            <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', gap: '8px' }}>
-              <div className="live-badge">
+            <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', gap: '8px', zIndex: 20, alignItems: 'center' }}>
+              <div className="live-badge" style={{ position: 'static' }}>
                 <div className="live-dot"></div>
                 LIVE BROADCAST
               </div>
-              <div className="live-badge" style={{ background: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.25)', color: '#f87171' }}>
+              <div className="live-badge" style={{ background: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.25)', color: '#f87171', position: 'static' }}>
                 <div className="live-dot" style={{ background: '#ef4444' }}></div>
                 REC
               </div>
+              {(() => {
+                const today = new Date();
+                const isFirstSunday = today.getDay() === 0 && today.getDate() <= 7;
+                return isFirstSunday ? (
+                  <div className="first-sunday-badge" style={{ position: 'static' }}>
+                    <BookOpen size={16} className="first-sunday-icon" />
+                    <span>First Sunday</span>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
 

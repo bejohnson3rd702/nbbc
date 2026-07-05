@@ -4,6 +4,7 @@ import {
   Hand, Sparkles, Volume2, BookOpen, Copy, Share2
 } from 'lucide-react';
 import { BIBLE_BOOKS } from '../data/bibleMetadata';
+import { supabase } from '../lib/supabaseClient';
 
 interface MemberStatus {
   email: string;
@@ -44,6 +45,7 @@ interface CongregationViewProps {
     toggleHandRaise: () => void;
     toggleCamera: () => void;
     toggleMic: () => void;
+    sendGivingUpdate: (total: number, recentTransaction: any) => void;
   };
 }
 
@@ -104,23 +106,65 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     setGivingError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/give', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: user.name,
-          email: user.email,
-          amount: givingAmount.trim(),
-          designation: givingDesignation
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit offering');
+      const floatAmount = parseFloat(givingAmount.trim());
+      if (isNaN(floatAmount) || floatAmount <= 0) {
+        throw new Error('Amount must be greater than 0');
       }
 
-      setGivingSubmitted(true);
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const isSupabaseConfigured = !!(url && anonKey && 
+                                   !url.includes('placeholder-project') && 
+                                   !anonKey.includes('placeholder-anon-key'));
+
+      if (isSupabaseConfigured) {
+        const transaction = {
+          name: user.name,
+          email: user.email || 'anonymous@nbbc.org',
+          amount: floatAmount,
+          designation: givingDesignation,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: new Date().toLocaleDateString()
+        };
+
+        const { data: insertedList, error: insertError } = await supabase
+          .from('giving')
+          .insert(transaction)
+          .select();
+
+        if (insertError) throw insertError;
+        const insertedTransaction = insertedList?.[0] || transaction;
+
+        // Fetch new total for real-time WebSocket broadcast
+        const { data: allGiving, error: sumError } = await supabase
+          .from('giving')
+          .select('amount');
+
+        if (!sumError && allGiving) {
+          const newTotal = allGiving.reduce((sum, item) => sum + Number(item.amount), 0);
+          sendGivingUpdate(newTotal, insertedTransaction);
+        }
+
+        setGivingSubmitted(true);
+      } else {
+        const response = await fetch('http://localhost:3001/api/give', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: user.name,
+            email: user.email,
+            amount: givingAmount.trim(),
+            designation: givingDesignation
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to submit offering');
+        }
+
+        setGivingSubmitted(true);
+      }
     } catch (err: any) {
       setGivingError(err.message || 'Connection to the giving portal failed.');
     } finally {
@@ -143,16 +187,43 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
 
   const fetchSermons = async () => {
     setLoadingArchive(true);
-    try {
-      const response = await fetch('http://localhost:3001/api/sermons');
-      if (response.ok) {
-        const data = await response.json();
-        setArchiveSermons(data);
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const isSupabaseConfigured = !!(url && anonKey && 
+                                 !url.includes('placeholder-project') && 
+                                 !anonKey.includes('placeholder-anon-key'));
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('sermons')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        
+        const formattedSermons = (data || []).map(s => ({
+          id: s.id,
+          title: s.title,
+          date: s.date,
+          videoUrl: s.video_url
+        }));
+        setArchiveSermons(formattedSermons);
+      } catch (e) {
+        console.error('Error fetching sermons from Supabase:', e);
+      } finally {
+        setLoadingArchive(false);
       }
-    } catch (e) {
-      console.error('Error fetching sermons:', e);
-    } finally {
-      setLoadingArchive(false);
+    } else {
+      try {
+        const response = await fetch('http://localhost:3001/api/sermons');
+        if (response.ok) {
+          const data = await response.json();
+          setArchiveSermons(data);
+        }
+      } catch (e) {
+        console.error('Error fetching sermons locally:', e);
+      } finally {
+        setLoadingArchive(false);
+      }
     }
   };
 
@@ -200,7 +271,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     sendReaction,
     toggleHandRaise,
     toggleCamera,
-    toggleMic
+    toggleMic,
+    sendGivingUpdate
   } = webrtc;
 
   // Find Pastor's stream in remoteStreams
@@ -451,9 +523,21 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           )}
 
           {isLive && (
-            <div className="live-badge" style={{ position: 'absolute', top: '20px', left: '20px' }}>
-              <div className="live-dot"></div>
-              SUNDAY SERVICE LIVE
+            <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', gap: '8px', zIndex: 20, alignItems: 'center' }}>
+              <div className="live-badge" style={{ position: 'static' }}>
+                <div className="live-dot"></div>
+                SUNDAY SERVICE LIVE
+              </div>
+              {(() => {
+                const today = new Date();
+                const isFirstSunday = today.getDay() === 0 && today.getDate() <= 7;
+                return isFirstSunday ? (
+                  <div className="first-sunday-badge" style={{ position: 'static' }}>
+                    <BookOpen size={16} className="first-sunday-icon" />
+                    <span>First Sunday</span>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
 

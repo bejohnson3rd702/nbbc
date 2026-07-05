@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Key, Church, Eye, EyeOff, Phone } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface AuthProps {
   onAuthSuccess: (user: { name: string; email: string; role: 'pastor' | 'member' }) => void;
@@ -17,34 +18,128 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Checks if the environment variables have been filled or are placeholders
+  const isSupabaseConfigured = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    return url && anonKey && 
+      !url.includes('placeholder-project') && 
+      !anonKey.includes('placeholder-anon-key');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const url = isLogin ? 'http://localhost:3001/api/login' : 'http://localhost:3001/api/register';
-    const payload = isLogin 
-      ? { email, password } 
-      : { name, email, password, phone, adminCode: showAdminField ? adminCode : undefined };
+    const emailClean = email.trim().toLowerCase();
+    const adminCodeClean = adminCode.trim();
+
+    // Dev Fallback check if Supabase is not configured yet
+    if (!isSupabaseConfigured()) {
+      setTimeout(() => {
+        setLoading(false);
+        if (isLogin) {
+          if (emailClean === 'pastor@nbbc.org' && password === 'password123') {
+            const mockUser = { name: 'Pastor John', email: 'pastor@nbbc.org', role: 'pastor' as const };
+            localStorage.setItem('nbbc_user', JSON.stringify(mockUser));
+            onAuthSuccess(mockUser);
+          } else if (emailClean === 'member@nbbc.org' && password === 'password123') {
+            const mockUser = { name: 'Jamie Johnson', email: 'jamiejohnson814@gmil.com', role: 'member' as const };
+            localStorage.setItem('nbbc_user', JSON.stringify(mockUser));
+            onAuthSuccess(mockUser);
+          } else {
+            setError('Dev Mode: Use "pastor@nbbc.org" / "password123" or "member@nbbc.org" / "password123" to sign in, or configure Supabase keys in your .env file.');
+          }
+        } else {
+          setError('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file to create new accounts.');
+        }
+      }, 500);
+      return;
+    }
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      if (isLogin) {
+        // 1. Authenticate with Supabase Auth
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: emailClean,
+          password,
+        });
 
-      const data = await response.json();
+        if (authError) throw authError;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Something went wrong');
+        if (data.user) {
+          // 2. Fetch profile from public.users table
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('name, email, role')
+            .eq('id', data.user.id)
+            .single();
+
+          if (profileError || !profile) {
+            // Profile fallback if not found in table
+            const fallbackUser = {
+              name: data.user.user_metadata?.name || 'Sanctuary Member',
+              email: emailClean,
+              role: (data.user.user_metadata?.role || 'member') as 'pastor' | 'member'
+            };
+            localStorage.setItem('nbbc_user', JSON.stringify(fallbackUser));
+            onAuthSuccess(fallbackUser);
+          } else {
+            const loggedInUser = {
+              name: profile.name,
+              email: profile.email,
+              role: profile.role as 'pastor' | 'member'
+            };
+            localStorage.setItem('nbbc_user', JSON.stringify(loggedInUser));
+            onAuthSuccess(loggedInUser);
+          }
+        }
+      } else {
+        // 1. Sign up user in Supabase Auth
+        const userRole = showAdminField && adminCodeClean === 'NBBC2026' ? 'pastor' : 'member';
+        
+        if (showAdminField && adminCodeClean !== 'NBBC2026') {
+          throw new Error('Invalid Church Administration Code');
+        }
+
+        const { data, error: authError } = await supabase.auth.signUp({
+          email: emailClean,
+          password,
+          options: {
+            data: {
+              name: name.trim(),
+              role: userRole,
+            }
+          }
+        });
+
+        if (authError) throw authError;
+
+        if (data.user) {
+          // 2. Insert profile record into public.users table
+          const { error: profileError } = await supabase.from('users').insert({
+            id: data.user.id,
+            email: emailClean,
+            name: name.trim(),
+            phone: phone.trim() || null,
+            role: userRole
+          });
+
+          if (profileError) throw profileError;
+
+          const registeredUser = {
+            name: name.trim(),
+            email: emailClean,
+            role: userRole as 'pastor' | 'member'
+          };
+          
+          localStorage.setItem('nbbc_user', JSON.stringify(registeredUser));
+          onAuthSuccess(registeredUser);
+        }
       }
-
-      // Success
-      localStorage.setItem('nbbc_user', JSON.stringify(data.user));
-      onAuthSuccess(data.user);
     } catch (err: any) {
-      setError(err.message || 'Connection failed. Is the server running?');
+      setError(err.message || 'Authentication failed. Please verify your credentials.');
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 interface User {
   name: string;
@@ -54,15 +55,39 @@ export default function useWebRTC(user: User | null) {
   const [givingToast, setGivingToast] = useState<any | null>(null);
 
   const fetchGivingSummary = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/api/giving-summary');
-      if (response.ok) {
-        const data = await response.json();
-        setGivingTotal(data.total);
-        setGivingTransactions(data.transactions || []);
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const isSupabaseConfigured = !!(url && anonKey && 
+                                 !url.includes('placeholder-project') && 
+                                 !anonKey.includes('placeholder-anon-key'));
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('giving')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        if (data) {
+          const total = data.reduce((sum, item) => sum + Number(item.amount), 0);
+          setGivingTotal(total);
+          setGivingTransactions(data);
+        }
+      } catch (e) {
+        console.error('Error fetching giving summary from Supabase:', e);
       }
-    } catch (e) {
-      console.error('Error fetching giving summary:', e);
+    } else {
+      try {
+        const response = await fetch('http://localhost:3001/api/giving-summary');
+        if (response.ok) {
+          const data = await response.json();
+          setGivingTotal(data.total);
+          setGivingTransactions(data.transactions || []);
+        }
+      } catch (e) {
+        console.error('Error fetching giving summary locally:', e);
+      }
     }
   };
 
@@ -359,7 +384,8 @@ export default function useWebRTC(user: User | null) {
   useEffect(() => {
     if (!user) return;
 
-    const ws = new WebSocket('ws://localhost:3001');
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'ws://localhost:3001';
+    const ws = new WebSocket(backendUrl);
     socketRef.current = ws;
     setSocket(ws);
 
@@ -723,6 +749,16 @@ export default function useWebRTC(user: User | null) {
     }
   };
 
+  const sendGivingUpdate = (total: number, recentTransaction: any) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: 'giving-update',
+        total,
+        recentTransaction
+      }));
+    }
+  };
+
   return {
     members,
     chatMessages,
@@ -747,6 +783,7 @@ export default function useWebRTC(user: User | null) {
     givingTransactions,
     givingToast,
     setGivingToast,
-    fetchGivingSummary
+    fetchGivingSummary,
+    sendGivingUpdate
   };
 }
