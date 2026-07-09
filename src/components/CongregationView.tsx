@@ -388,18 +388,15 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       if (!document.getElementById('youtube-lobby-player')) return;
 
       player = new (window as any).YT.Player('youtube-lobby-player', {
-        height: '0',
-        width: '0',
+        height: '100%',
+        width: '100%',
+        videoId: 't5mSRTqW_y8', // Kirk Franklin - I Smile (Official Video)
         playerVars: {
-          listType: 'playlist',
-          list: 'PLq3b6sLp417g0d7u6fBfP4rYhUq_qE4V-', // Curated Kirk Franklin Greatest Hits Playlist
           autoplay: 1,
           loop: 1,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          rel: 0,
-          showinfo: 0
+          playlist: 't5mSRTqW_y8', // Required for loop to work
+          controls: 1, // Let them control if they want
+          rel: 0
         },
         events: {
           onReady: (event: any) => {
@@ -570,8 +567,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           />
         ))}
 
-      {/* Hidden YouTube player for background music in the lobby (placed off-screen to allow browser rendering/playback) */}
-      <div id="youtube-lobby-player" style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}></div>
+
 
       {/* Floating reactions wrapper */}
       <div className="reactions-container">
@@ -668,6 +664,11 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                 <div style={{ background: 'rgba(226,168,80,0.1)', color: 'var(--primary-gold)', border: '1px solid var(--primary-gold)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600 }}>
                   Sanctuary Lobby Active
                 </div>
+              </div>
+
+              {/* Lobby Music Video Player */}
+              <div style={{ width: '100%', maxWidth: '640px', aspectRatio: '16/9', margin: '0 auto 10px auto', borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--primary-gold)', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }}>
+                <div id="youtube-lobby-player" style={{ width: '100%', height: '100%' }}></div>
               </div>
 
               {/* Lobby Video Feeds Grid */}
