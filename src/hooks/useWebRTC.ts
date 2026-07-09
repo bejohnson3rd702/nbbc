@@ -728,10 +728,16 @@ export default function useWebRTC(user: User | null) {
           if (signalData.sdp) {
             await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
             if (signalData.sdp.type === 'offer') {
-              // Add local stream tracks if available
+              // Add local stream tracks to transceivers if available
               if (localStreamRef.current) {
                 localStreamRef.current.getTracks().forEach(track => {
-                  pc.addTrack(track, localStreamRef.current!);
+                  const transceiver = pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === track.kind);
+                  if (transceiver) {
+                    transceiver.direction = 'sendrecv';
+                    transceiver.sender.replaceTrack(track).catch(e => console.error('Error replacing track on offer:', e));
+                  } else {
+                    pc.addTrack(track, localStreamRef.current!);
+                  }
                 });
               }
               const answer = await pc.createAnswer();
@@ -837,9 +843,9 @@ export default function useWebRTC(user: User | null) {
         pc.addTrack(track, localStreamRef.current!);
       });
     } else {
-      // Create transceivers to receive video/audio even if we aren't sending
-      pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
+      // Create transceivers in sendrecv mode to allow seamless camera/mic unmuting
+      pc.addTransceiver('video', { direction: 'sendrecv' });
+      pc.addTransceiver('audio', { direction: 'sendrecv' });
     }
 
     const offer = await pc.createOffer();
