@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Send, Users, 
-  LogOut, Radio, Hand, Sparkles, BookOpen
+  LogOut, Radio, Hand, BookOpen
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { API_BASE } from '../lib/apiConfig';
@@ -108,7 +108,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
   const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms' | 'spotlight'>('chat');
   const [chatInput, setChatInput] = useState('');
   const [prayerInput, setPrayerInput] = useState('');
-  const [simulationActive, setSimulationActive] = useState(false);
+  const [simulationActive] = useState(false);
 
   // Scripture Spotlight local UI states
   const [spotlightBook, setSpotlightBook] = useState('John');
@@ -659,14 +659,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button 
-              className={`btn ${simulationActive ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setSimulationActive(!simulationActive)}
-              title="Simulates mock congregation members, chats, and hand-raises for demo testing."
-            >
-              <Sparkles size={16} />
-              {simulationActive ? 'Disable Simulation' : 'Simulate Congregation'}
-            </button>
+
             <button className="btn btn-secondary" onClick={onLogout}>
               <LogOut size={16} />
               Log Out
