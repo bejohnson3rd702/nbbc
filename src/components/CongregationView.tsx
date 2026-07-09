@@ -356,6 +356,85 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   // Combine real and simulated state
   const isLive = serviceStatus === 'live' || demoServiceActive;
 
+  // YouTube Lobby Background Music Player
+  const ytPlayerRef = useRef<any>(null);
+
+  useEffect(() => {
+    // If the service is live, pause and do not play background music!
+    if (isLive) {
+      if (ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.pauseVideo();
+        } catch (e) {
+          console.warn('Error pausing YouTube player:', e);
+        }
+      }
+      return;
+    }
+
+    // Load the YouTube IFrame Player API script if not loaded
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+
+    let player: any;
+    const initPlayer = () => {
+      if (!document.getElementById('youtube-lobby-player')) return;
+
+      player = new (window as any).YT.Player('youtube-lobby-player', {
+        height: '0',
+        width: '0',
+        playerVars: {
+          listType: 'playlist',
+          list: 'PLq3b6sLp417g0d7u6fBfP4rYhUq_qE4V-', // Curated Kirk Franklin Greatest Hits Playlist
+          autoplay: 1,
+          loop: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          rel: 0,
+          showinfo: 0
+        },
+        events: {
+          onReady: (event: any) => {
+            ytPlayerRef.current = event.target;
+            event.target.setVolume(10); // 10% volume!
+            event.target.playVideo();
+          },
+          onStateChange: (event: any) => {
+            if (event.data === (window as any).YT.PlayerState.UNSTARTED) {
+              event.target.setVolume(10);
+              event.target.playVideo();
+            }
+          }
+        }
+      });
+    };
+
+    if ((window as any).YT && (window as any).YT.Player) {
+      initPlayer();
+    } else {
+      const previousReady = (window as any).onYouTubeIframeAPIReady;
+      (window as any).onYouTubeIframeAPIReady = () => {
+        if (previousReady) previousReady();
+        initPlayer();
+      };
+    }
+
+    return () => {
+      if (player) {
+        try {
+          player.destroy();
+        } catch (e) {
+          console.warn('Error destroying YouTube player:', e);
+        }
+      }
+    };
+  }, [isLive]);
+
   const allMembers = demoServiceActive
     ? [...members, ...SIMULATED_MEMBERS.filter(sm => !members.some(m => m.email === sm.email))]
     : members;
@@ -467,6 +546,9 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             autoPlay
           />
         ))}
+
+      {/* Hidden YouTube player for background music in the lobby */}
+      <div id="youtube-lobby-player" style={{ display: 'none' }}></div>
 
       {/* Floating reactions wrapper */}
       <div className="reactions-container">
