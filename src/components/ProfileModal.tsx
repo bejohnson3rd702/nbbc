@@ -95,7 +95,14 @@ export default function ProfileModal({ user, onClose, onUpdate }: ProfileModalPr
         })
         .eq('email', user.email);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.warn('Profile update with bio/avatar failed, trying fallback update (name only)...');
+        const { error: fallbackError } = await supabase
+          .from('users')
+          .update({ name: name.trim() })
+          .eq('email', user.email);
+        if (fallbackError) throw fallbackError;
+      }
 
       // 2. Dispatch profile updated event so App.tsx is notified
       const updatedUser = {

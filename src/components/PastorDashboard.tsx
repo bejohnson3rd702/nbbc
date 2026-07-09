@@ -326,10 +326,19 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
   useEffect(() => {
     const fetchRegisteredUsers = async () => {
       try {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('users')
           .select('name, email, role, bio, avatar_url');
-        if (error) throw error;
+        
+        if (error) {
+          console.warn('bio or avatar_url columns missing, trying fallback query...');
+          const fallbackResult = await supabase
+            .from('users')
+            .select('name, email, role');
+          if (fallbackResult.error) throw fallbackResult.error;
+          data = fallbackResult.data ? fallbackResult.data.map((u: any) => ({ ...u, bio: '', avatar_url: '' })) : null;
+        }
+
         if (data) {
           setRegisteredUsers(data);
         }

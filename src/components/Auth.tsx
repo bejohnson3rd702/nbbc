@@ -70,11 +70,22 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
         if (data.user) {
           // 2. Fetch profile from public.users table
-          const { data: profile, error: profileError } = await supabase
+          let { data: profile, error: profileError } = await supabase
             .from('users')
             .select('name, email, role, bio, avatar_url')
             .eq('id', data.user.id)
             .single();
+
+          if (profileError) {
+            console.warn('Columns bio/avatar_url might be missing, running fallback select...');
+            const fallbackResult = await supabase
+              .from('users')
+              .select('name, email, role')
+              .eq('id', data.user.id)
+              .single();
+            profile = fallbackResult.data ? { ...fallbackResult.data, bio: '', avatar_url: '' } : null;
+            profileError = fallbackResult.error;
+          }
 
           if (profileError || !profile) {
             // Profile fallback if not found in table
@@ -92,8 +103,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               name: profile.name,
               email: profile.email,
               role: profile.role as 'pastor' | 'member',
-              bio: profile.bio || '',
-              avatar_url: profile.avatar_url || ''
+              bio: (profile as any).bio || '',
+              avatar_url: (profile as any).avatar_url || ''
             };
             localStorage.setItem('nbbc_user', JSON.stringify(loggedInUser));
             onAuthSuccess(loggedInUser);
