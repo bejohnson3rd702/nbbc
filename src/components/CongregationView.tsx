@@ -390,11 +390,11 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       player = new (window as any).YT.Player('youtube-lobby-player', {
         height: '100%',
         width: '100%',
-        videoId: 't5mSRTqW_y8', // Kirk Franklin - I Smile (Official Video)
+        videoId: 'gT8d357s1-k', // Kirk Franklin - I Smile (Official Lyric Video - Embed Allowed)
         playerVars: {
           autoplay: 1,
           loop: 1,
-          playlist: 't5mSRTqW_y8', // Required for loop to work
+          playlist: 'gT8d357s1-k', // Required for loop to work
           controls: 1, // Let them control if they want
           rel: 0
         },
