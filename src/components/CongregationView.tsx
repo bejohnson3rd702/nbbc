@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { BIBLE_BOOKS } from '../data/bibleMetadata';
 import { supabase } from '../lib/supabaseClient';
+import { API_BASE } from '../lib/apiConfig';
 
 interface MemberStatus {
   email: string;
@@ -147,7 +148,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
 
         setGivingSubmitted(true);
       } else {
-        const response = await fetch('http://localhost:3001/api/give', {
+        const response = await fetch(`${API_BASE}/api/give`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -214,7 +215,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       }
     } else {
       try {
-        const response = await fetch('http://localhost:3001/api/sermons');
+        const response = await fetch(`${API_BASE}/api/sermons`);
         if (response.ok) {
           const data = await response.json();
           setArchiveSermons(data);
@@ -784,7 +785,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                       Watch Service
                     </button>
                     <a 
-                      href={`http://localhost:3001${sermon.videoUrl}`}
+                      href={sermon.videoUrl.startsWith('http') ? sermon.videoUrl : `${API_BASE}${sermon.videoUrl}`}
                       download={sermon.title}
                       className="btn btn-secondary"
                       style={{ flex: 1, padding: '6px 10px', fontSize: '0.75rem', textAlign: 'center', textDecoration: 'none' }}
@@ -1122,7 +1123,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             
             <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '8px', overflow: 'hidden' }}>
               <video 
-                src={`http://localhost:3001${selectedSermon.videoUrl}`} 
+                src={selectedSermon.videoUrl.startsWith('http') ? selectedSermon.videoUrl : `${API_BASE}${selectedSermon.videoUrl}`} 
                 controls 
                 autoPlay 
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { API_BASE, WS_URL } from '../lib/apiConfig';
 
 interface User {
   name: string;
@@ -79,7 +80,7 @@ export default function useWebRTC(user: User | null) {
       }
     } else {
       try {
-        const response = await fetch('http://localhost:3001/api/giving-summary');
+        const response = await fetch(`${API_BASE}/api/giving-summary`);
         if (response.ok) {
           const data = await response.json();
           setGivingTotal(data.total);
@@ -384,8 +385,7 @@ export default function useWebRTC(user: User | null) {
   useEffect(() => {
     if (!user) return;
 
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'ws://localhost:3001';
-    const ws = new WebSocket(backendUrl);
+    const ws = new WebSocket(WS_URL);
     socketRef.current = ws;
     setSocket(ws);
 

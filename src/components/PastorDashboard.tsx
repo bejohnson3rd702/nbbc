@@ -4,6 +4,7 @@ import {
   LogOut, Radio, Hand, Sparkles, BookOpen
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { API_BASE } from '../lib/apiConfig';
 
 interface MemberStatus {
   email: string;
@@ -109,7 +110,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
       }
     } else {
       try {
-        const response = await fetch('http://localhost:3001/api/sms-history');
+        const response = await fetch(`${API_BASE}/api/sms-history`);
         if (response.ok) {
           const data = await response.json();
           setSmsHistory(data);
@@ -174,7 +175,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
         fetchSMSHistory();
         setTimeout(() => setSmsSuccess(false), 5000);
       } else {
-        const response = await fetch('http://localhost:3001/api/send-sms', {
+        const response = await fetch(`${API_BASE}/api/send-sms`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: smsMessage.trim() })
@@ -348,7 +349,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
 
         if (dbError) throw dbError;
       } else {
-        const response = await fetch('http://localhost:3001/api/upload-sermon', {
+        const response = await fetch(`${API_BASE}/api/upload-sermon`, {
           method: 'POST',
           headers: {
             'Content-Type': 'video/webm',
