@@ -483,26 +483,35 @@ export default function useWebRTC(user: User | null) {
       
       updateMediaStateOnServer(video, !audio);
 
-      // Update active WebRTC connections with new tracks using replaceTrack
+      // Update active WebRTC connections with new tracks using replaceTrack/transceivers
       Object.keys(pcsRef.current).forEach(email => {
         const pc = pcsRef.current[email];
         const senders = pc.getSenders();
 
         finalStream.getTracks().forEach(track => {
-          const sender = senders.find(s => s.track && s.track.kind === track.kind);
-          if (sender) {
-            sender.replaceTrack(track).catch(err => {
+          // Find existing transceiver of this kind (e.g. video or audio)
+          const transceiver = pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === track.kind);
+          if (transceiver) {
+            transceiver.direction = 'sendrecv';
+            transceiver.sender.replaceTrack(track).catch(err => {
               console.error(`Error replacing track for ${email}:`, err);
             });
           } else {
-            pc.addTrack(track, finalStream);
+            const sender = senders.find(s => s.track && s.track.kind === track.kind);
+            if (sender) {
+              sender.replaceTrack(track).catch(err => {
+                console.error(`Error replacing track for ${email}:`, err);
+              });
+            } else {
+              pc.addTrack(track, finalStream);
+            }
           }
         });
         
-        // Remove any senders whose track kind is no longer in finalStream
-        senders.forEach(sender => {
-          if (sender.track && !finalStream.getTracks().some(t => t.kind === sender.track!.kind)) {
-            pc.removeTrack(sender);
+        // Disable sending for tracks not in finalStream
+        pc.getTransceivers().forEach(t => {
+          if (t.sender && t.sender.track && !finalStream.getTracks().some(tr => tr.kind === t.sender.track!.kind)) {
+            t.direction = 'recvonly';
           }
         });
       });
@@ -759,11 +768,22 @@ export default function useWebRTC(user: User | null) {
     };
 
     pc.ontrack = (event) => {
-      console.log(`Received remote track from ${remoteEmail}`);
-      setRemoteStreams(prev => ({
-        ...prev,
-        [remoteEmail]: event.streams[0]
-      }));
+      console.log(`Received remote track from ${remoteEmail}:`, event.track.kind);
+      setRemoteStreams(prev => {
+        const currentStream = prev[remoteEmail];
+        let streamToUse = currentStream;
+        if (!streamToUse || !(streamToUse instanceof MediaStream)) {
+          streamToUse = new MediaStream();
+        }
+        const trackExists = streamToUse.getTracks().some(t => t.id === event.track.id);
+        if (!trackExists) {
+          streamToUse.addTrack(event.track);
+        }
+        return {
+          ...prev,
+          [remoteEmail]: streamToUse
+        };
+      });
     };
 
     pc.onnegotiationneeded = async () => {
