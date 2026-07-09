@@ -99,6 +99,7 @@ export default function useWebRTC(user: User | null) {
   // Prayer Wall & Scripture Spotlight States
   const [prayers, setPrayers] = useState<any[]>([]);
   const [activeSpotlight, setActiveSpotlight] = useState<{ text: string; reference?: string } | null>(null);
+  const [activeLyrics, setActiveLyrics] = useState<{ text: string; title: string } | null>(null);
   const [sermonTimeline, setSermonTimeline] = useState<{ timestamp: string; type: 'scripture' | 'point'; text: string }[]>([]);
 
   const fetchPrayers = async () => {
@@ -229,6 +230,13 @@ export default function useWebRTC(user: User | null) {
     socketRef.current?.send(JSON.stringify({
       type: 'scripture-spotlight',
       scripture: text ? { text, reference } : null
+    }));
+  };
+
+  const spotlightLyrics = (text: string | null, title?: string) => {
+    socketRef.current?.send(JSON.stringify({
+      type: 'spotlight-lyrics',
+      lyrics: text ? { text, title: title || '' } : null
     }));
   };
 
@@ -677,6 +685,11 @@ export default function useWebRTC(user: User | null) {
               }
             ]);
           }
+          break;
+        }
+
+        case 'spotlight-lyrics': {
+          setActiveLyrics(msg.lyrics);
           break;
         }
 
@@ -1135,6 +1148,8 @@ export default function useWebRTC(user: User | null) {
     sermonTimeline,
     setSermonTimeline,
     updateProfile,
-    updateRole
+    updateRole,
+    activeLyrics,
+    spotlightLyrics
   };
 }

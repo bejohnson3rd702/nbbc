@@ -85,6 +85,8 @@ interface PastorDashboardProps {
     revokeMemberMedia: (memberEmail: string) => void;
     updateProfile: (name: string, bio: string, avatarUrl: string) => void;
     updateRole: (email: string, role: string) => void;
+    activeLyrics: { text: string; title: string } | null;
+    spotlightLyrics: (text: string | null, title?: string) => void;
   };
 }
 
@@ -317,7 +319,9 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     muteMember,
     revokeMemberMedia,
     updateProfile,
-    updateRole
+    updateRole,
+    activeLyrics,
+    spotlightLyrics
   } = webrtc;
 
   const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
@@ -348,6 +352,84 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     };
     fetchRegisteredUsers();
   }, [members]);
+
+  // Hymn & Lyrics Spotlight states
+  const [songs, setSongs] = useState<any[]>([]);
+  const [spotlightSubTab, setSpotlightSubTab] = useState<'scripture' | 'lyrics'>('scripture');
+  const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
+  const [showAddSongForm, setShowAddSongForm] = useState(false);
+  const [newSongTitle, setNewSongTitle] = useState('');
+  const [newSongAuthor, setNewSongAuthor] = useState('');
+  const [newSongLyrics, setNewSongLyrics] = useState('');
+
+  const fetchSongs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .select('*')
+        .order('title');
+      if (error) throw error;
+      if (data) {
+        setSongs(data);
+      }
+    } catch (err) {
+      console.warn('Failed to load songs from database, using local fallbacks:', err);
+      setSongs([
+        {
+          id: 'amazing-grace',
+          title: 'Amazing Grace',
+          author: 'John Newton',
+          lyrics: "Amazing grace! How sweet the sound\nThat saved a wretch like me!\nI once was lost, but now am found;\nWas blind, but now I see.\n\n'Twas grace that taught my heart to fear,\nAnd grace my fears relieved;\nHow precious did that grace appear\nThe hour I first believed.\n\nThrough many dangers, toils and snares,\nI have already come;\n'Tis grace hath brought me safe thus far,\nAnd grace will lead me home."
+        },
+        {
+          id: 'how-great-thou-art',
+          title: 'How Great Thou Art',
+          author: 'Carl Boberg',
+          lyrics: "O Lord my God, when I in awesome wonder\nConsider all the worlds Thy hands have made;\nI see the stars, I hear the rolling thunder,\nThy power throughout the universe displayed.\n\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art, how great Thou art!\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art, how great Thou art!"
+        }
+      ]);
+    }
+  };
+
+  const handleAddSong = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSongTitle.trim() || !newSongLyrics.trim()) return;
+
+    const songData = {
+      title: newSongTitle.trim(),
+      author: newSongAuthor.trim() || 'Unknown Author',
+      lyrics: newSongLyrics.trim()
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('songs')
+        .insert([songData])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setSongs(prev => [...prev, data].sort((a,b) => a.title.localeCompare(b.title)));
+      }
+    } catch (err) {
+      console.warn('Failed to save song to database, saving to local list:', err);
+      const localNewSong = {
+        id: `local-${Date.now()}`,
+        ...songData
+      };
+      setSongs(prev => [...prev, localNewSong].sort((a,b) => a.title.localeCompare(b.title)));
+    }
+
+    setNewSongTitle('');
+    setNewSongAuthor('');
+    setNewSongLyrics('');
+    setShowAddSongForm(false);
+  };
+
+  useEffect(() => {
+    fetchSongs();
+  }, []);
 
   // Set local video stream
   useEffect(() => {
@@ -858,6 +940,20 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
               </div>
             </div>
           )}
+
+          {/* Lyrics Spotlight Overlay */}
+          {activeLyrics && (
+            <div className="scripture-spotlight-overlay" style={{ background: 'rgba(15, 23, 42, 0.9)', borderColor: '#e2a850' }}>
+              <div className="spotlight-content" style={{ maxWidth: '600px', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--primary-gold)', letterSpacing: '2px', fontWeight: 'bold', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                  🎵 Singing: {activeLyrics.title}
+                </span>
+                <p className="spotlight-text" style={{ fontSize: '1.4rem', fontWeight: 500, whiteSpace: 'pre-line', margin: 0, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                  {activeLyrics.text}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Congregation Grid */}
@@ -1193,137 +1289,329 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
         {/* Spotlight Tab */}
         {activeTab === 'spotlight' && (
           <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
-              Scripture Spotlight
-            </h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Spotlight Bible verses or custom text overlays on everyone's live video stream.
-            </p>
-
-            {/* Current Active Spotlight */}
-            <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.2)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600 }}>CURRENTLY SPOTLIT:</span>
-              {activeSpotlight ? (
-                <div style={{ marginTop: '6px' }}>
-                  <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>"{activeSpotlight.text}"</p>
-                  {activeSpotlight.reference && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-gold)', margin: '4px 0 0 0', textAlign: 'right' }}>— {activeSpotlight.reference}</p>
-                  )}
-                  <button 
-                    onClick={() => spotlightScripture('', '')}
-                    className="btn btn-danger" 
-                    style={{ width: '100%', marginTop: '10px', padding: '6px' }}
-                  >
-                    Clear Spotlight
-                  </button>
-                </div>
-              ) : (
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>Nothing is currently spotlit.</p>
-              )}
-            </div>
-
-            {/* Custom Spotlight Form */}
-            <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>CUSTOM STREAM OVERLAY</span>
-              <textarea 
-                className="form-input"
-                rows={2}
-                placeholder="Type a sermon point or notice (e.g. 'Welcome to NBBC!')"
-                value={customSpotlightText}
-                onChange={(e) => setCustomSpotlightText(e.target.value)}
-                style={{ resize: 'none', fontSize: '0.85rem' }}
-              />
-              <input 
-                type="text" 
-                className="form-input"
-                placeholder="Optional subtext (e.g. 'Announcement')"
-                value={customSpotlightRef}
-                onChange={(e) => setCustomSpotlightRef(e.target.value)}
-                style={{ fontSize: '0.85rem' }}
-              />
-              <button 
-                onClick={() => {
-                  if (customSpotlightText.trim()) {
-                    spotlightScripture(customSpotlightText.trim(), customSpotlightRef.trim());
-                    setCustomSpotlightText('');
-                    setCustomSpotlightRef('');
-                  }
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setSpotlightSubTab('scripture')}
+                style={{
+                  flex: 1,
+                  padding: '6px',
+                  fontSize: '0.8rem',
+                  background: spotlightSubTab === 'scripture' ? 'rgba(226,168,80,0.15)' : 'none',
+                  border: spotlightSubTab === 'scripture' ? '1px solid var(--primary-gold)' : '1px solid rgba(255,255,255,0.06)',
+                  color: spotlightSubTab === 'scripture' ? 'white' : 'var(--text-muted)',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
                 }}
-                className="btn btn-primary"
-                style={{ width: '100%', padding: '6px' }}
-                disabled={!customSpotlightText.trim()}
               >
-                Spotlight Custom Text
+                Scripture
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpotlightSubTab('lyrics')}
+                style={{
+                  flex: 1,
+                  padding: '6px',
+                  fontSize: '0.8rem',
+                  background: spotlightSubTab === 'lyrics' ? 'rgba(226,168,80,0.15)' : 'none',
+                  border: spotlightSubTab === 'lyrics' ? '1px solid var(--primary-gold)' : '1px solid rgba(255,255,255,0.06)',
+                  color: spotlightSubTab === 'lyrics' ? 'white' : 'var(--text-muted)',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Hymns & Lyrics
               </button>
             </div>
 
-            {/* Bible Verse Spotlight Browser */}
-            <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>BROWSE BIBLE TO SPOTLIGHT</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <select 
-                  className="form-input"
-                  value={spotlightBook}
-                  onChange={(e) => {
-                    const newBook = e.target.value;
-                    setSpotlightBook(newBook);
-                    setSpotlightChapter(1);
-                    fetchBibleVerses(`${newBook} 1`);
-                  }}
-                  style={{ flex: 2, padding: '4px 8px', background: '#111726', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                >
-                  {BIBLE_BOOKS.map((b) => (
-                    <option key={b.name} value={b.name}>{b.name}</option>
-                  ))}
-                </select>
+            {spotlightSubTab === 'scripture' ? (
+              <>
+                <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px', marginTop: 0 }}>
+                  Scripture Spotlight
+                </h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Spotlight Bible verses or custom text overlays on everyone's live video stream.
+                </p>
 
-                <select 
-                  className="form-input"
-                  value={spotlightChapter}
-                  onChange={(e) => {
-                    const newCh = parseInt(e.target.value);
-                    setSpotlightChapter(newCh);
-                    fetchBibleVerses(`${spotlightBook} ${newCh}`);
-                  }}
-                  style={{ flex: 1, padding: '4px 8px', background: '#111726', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                >
-                  {Array.from(
-                    { length: BIBLE_BOOKS.find(b => b.name === spotlightBook)?.chapters || 1 },
-                    (_, i) => (
-                      <option key={i + 1} value={i + 1}>{i + 1}</option>
-                    )
-                  )}
-                </select>
-              </div>
-
-              {loadingBible ? (
-                <div style={{ textAlign: 'center', color: 'var(--primary-gold)', fontSize: '0.85rem', padding: '10px' }}>Loading scripture...</div>
-              ) : bibleError ? (
-                <div style={{ color: '#ef4444', fontSize: '0.8rem', textAlign: 'center' }}>{bibleError}</div>
-              ) : (
-                <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
-                  {spotlightVerses.map((v) => (
-                    <div 
-                      key={v.verse} 
-                      onClick={() => spotlightScripture(v.text, `${spotlightBook} ${spotlightChapter}:${v.verse}`)}
-                      style={{ 
-                        padding: '6px 8px', 
-                        background: 'rgba(255,255,255,0.02)', 
-                        borderRadius: '4px', 
-                        cursor: 'pointer', 
-                        fontSize: '0.8rem',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(226,168,80,0.1)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                    >
-                      <strong style={{ color: 'var(--primary-gold)', marginRight: '6px' }}>{v.verse}</strong>
-                      {v.text}
+                {/* Current Active Spotlight */}
+                <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.2)' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600 }}>CURRENTLY SPOTLIT:</span>
+                  {activeSpotlight ? (
+                    <div style={{ marginTop: '6px' }}>
+                      <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>"{activeSpotlight.text}"</p>
+                      {activeSpotlight.reference && (
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-gold)', margin: '4px 0 0 0', textAlign: 'right' }}>— {activeSpotlight.reference}</p>
+                      )}
+                      <button 
+                        onClick={() => spotlightScripture('', '')}
+                        className="btn btn-danger" 
+                        style={{ width: '100%', marginTop: '10px', padding: '6px' }}
+                      >
+                        Clear Spotlight
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>Nothing is currently spotlit.</p>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {/* Custom Spotlight Form */}
+                <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>CUSTOM STREAM OVERLAY</span>
+                  <textarea 
+                    className="form-input"
+                    rows={2}
+                    placeholder="Type a sermon point or notice (e.g. 'Welcome to NBBC!')"
+                    value={customSpotlightText}
+                    onChange={(e) => setCustomSpotlightText(e.target.value)}
+                    style={{ resize: 'none', fontSize: '0.85rem' }}
+                  />
+                  <input 
+                    type="text" 
+                    className="form-input"
+                    placeholder="Optional subtext (e.g. 'Announcement')"
+                    value={customSpotlightRef}
+                    onChange={(e) => setCustomSpotlightRef(e.target.value)}
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                  <button 
+                    onClick={() => {
+                      if (customSpotlightText.trim()) {
+                        spotlightScripture(customSpotlightText.trim(), customSpotlightRef.trim());
+                        setCustomSpotlightText('');
+                        setCustomSpotlightRef('');
+                      }
+                    }}
+                    className="btn btn-primary"
+                    style={{ width: '100%', padding: '6px' }}
+                    disabled={!customSpotlightText.trim()}
+                  >
+                    Spotlight Custom Text
+                  </button>
+                </div>
+
+                {/* Bible Verse Spotlight Browser */}
+                <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>BROWSE BIBLE TO SPOTLIGHT</span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select 
+                      className="form-input"
+                      value={spotlightBook}
+                      onChange={(e) => {
+                        const newBook = e.target.value;
+                        setSpotlightBook(newBook);
+                        setSpotlightChapter(1);
+                        fetchBibleVerses(`${newBook} 1`);
+                      }}
+                      style={{ flex: 2, padding: '4px 8px', background: '#111726', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
+                    >
+                      {BIBLE_BOOKS.map((b) => (
+                        <option key={b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+
+                    <select 
+                      className="form-input"
+                      value={spotlightChapter}
+                      onChange={(e) => {
+                        const newCh = parseInt(e.target.value);
+                        setSpotlightChapter(newCh);
+                        fetchBibleVerses(`${spotlightBook} ${newCh}`);
+                      }}
+                      style={{ flex: 1, padding: '4px 8px', background: '#111726', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
+                    >
+                      {Array.from(
+                        { length: BIBLE_BOOKS.find(b => b.name === spotlightBook)?.chapters || 1 },
+                        (_, i) => (
+                          <option key={i + 1} value={i + 1}>{i + 1}</option>
+                        )
+                      )}
+                    </select>
+                  </div>
+
+                  {loadingBible ? (
+                    <div style={{ textAlign: 'center', color: 'var(--primary-gold)', fontSize: '0.85rem', padding: '10px' }}>Loading scripture...</div>
+                  ) : bibleError ? (
+                    <div style={{ color: '#ef4444', fontSize: '0.8rem', textAlign: 'center' }}>{bibleError}</div>
+                  ) : (
+                    <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
+                      {spotlightVerses.map((v) => (
+                        <div 
+                          key={v.verse} 
+                          onClick={() => spotlightScripture(v.text, `${spotlightBook} ${spotlightChapter}:${v.verse}`)}
+                          style={{ 
+                            padding: '6px 8px', 
+                            background: 'rgba(255,255,255,0.02)', 
+                            borderRadius: '4px', 
+                            cursor: 'pointer', 
+                            fontSize: '0.8rem',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(226,168,80,0.1)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                        >
+                          <strong style={{ color: 'var(--primary-gold)', marginRight: '6px' }}>{v.verse}</strong>
+                          {v.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', margin: 0 }}>
+                    Hymns & Song Lyrics
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSongForm(!showAddSongForm)}
+                    className="btn btn-primary"
+                    style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                  >
+                    {showAddSongForm ? 'Back to Songs' : '+ Add New Song'}
+                  </button>
+                </div>
+
+                {/* Active Lyrics Overlay Status */}
+                <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.2)' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600 }}>CURRENTLY SPOTLIT LYRIC:</span>
+                  {activeLyrics ? (
+                    <div style={{ marginTop: '6px' }}>
+                      <p style={{ fontSize: '0.85rem', fontStyle: 'italic', margin: 0, whiteSpace: 'pre-line' }}>"{activeLyrics.text}"</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-gold)', margin: '4px 0 0 0', textAlign: 'right' }}>— {activeLyrics.title}</p>
+                      <button 
+                        onClick={() => spotlightLyrics(null)}
+                        className="btn btn-danger" 
+                        style={{ width: '100%', marginTop: '10px', padding: '6px' }}
+                      >
+                        Clear Lyrics Overlay
+                      </button>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>No lyrics are currently spotlit.</p>
+                  )}
+                </div>
+
+                {showAddSongForm ? (
+                  <form onSubmit={handleAddSong} className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>REGISTER NEW WORSHIP SONG</span>
+                    
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Song Title</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={newSongTitle} 
+                        onChange={(e) => setNewSongTitle(e.target.value)} 
+                        placeholder="e.g. Amazing Grace"
+                        required 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Song Author / Artist</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={newSongAuthor} 
+                        onChange={(e) => setNewSongAuthor(e.target.value)} 
+                        placeholder="e.g. John Newton"
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontSize: '0.75rem' }}>Lyrics (Separate slides by a blank line)</label>
+                      <textarea 
+                        className="form-input" 
+                        rows={6}
+                        value={newSongLyrics} 
+                        onChange={(e) => setNewSongLyrics(e.target.value)} 
+                        placeholder={"Verse 1 text goes here...\n\nChorus text goes here...\n\nVerse 2 text goes here..."}
+                        style={{ resize: 'none', fontFamily: 'inherit', fontSize: '0.8rem' }}
+                        required 
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '4px' }}>
+                      Save Song to Catalog
+                    </button>
+                  </form>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>SONG CATALOG</span>
+                    
+                    {songs.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px', fontSize: '0.8rem' }}>
+                        No songs registered yet. Click "+ Add New Song" to populate.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {songs.map((song) => {
+                          const isExpanded = expandedSongId === song.id;
+                          const slides = song.lyrics.split('\n\n').filter((s: string) => s.trim());
+
+                          return (
+                            <div key={song.id} className="glass-panel" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div 
+                                onClick={() => setExpandedSongId(isExpanded ? null : song.id)}
+                                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                              >
+                                <div>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>{song.title}</span>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '8px' }}>by {song.author || 'Unknown'}</span>
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)' }}>
+                                  {isExpanded ? 'Collapse' : `Expand (${slides.length} slides)`}
+                                </span>
+                              </div>
+
+                              {isExpanded && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
+                                  {slides.map((slide: string, idx: number) => {
+                                    const isCurrent = activeLyrics && activeLyrics.text === slide && activeLyrics.title === song.title;
+                                    return (
+                                      <div
+                                        key={idx}
+                                        onClick={() => spotlightLyrics(isCurrent ? null : slide, song.title)}
+                                        style={{
+                                          padding: '8px 10px',
+                                          borderRadius: '6px',
+                                          background: isCurrent ? 'rgba(226,168,80,0.12)' : 'rgba(255,255,255,0.01)',
+                                          border: isCurrent ? '1px solid var(--primary-gold)' : '1px solid rgba(255,255,255,0.04)',
+                                          cursor: 'pointer',
+                                          fontSize: '0.75rem',
+                                          color: isCurrent ? 'white' : 'var(--text-muted)',
+                                          whiteSpace: 'pre-line',
+                                          lineHeight: '1.4',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!isCurrent) e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (!isCurrent) e.currentTarget.style.background = 'rgba(255,255,255,0.01)';
+                                        }}
+                                      >
+                                        <span style={{ fontSize: '0.6rem', color: 'var(--primary-gold)', display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+                                          SLIDE {idx + 1}
+                                        </span>
+                                        {slide}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

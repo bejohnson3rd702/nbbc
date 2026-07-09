@@ -90,6 +90,8 @@ interface CongregationViewProps {
     sendPushAnnouncement: (title: string, text: string) => void;
     spotlightScripture: (text: string, reference?: string) => void;
     updateProfile: (name: string, bio: string, avatarUrl: string) => void;
+    activeLyrics: { text: string; title: string } | null;
+    spotlightLyrics: (text: string | null, title?: string) => void;
   };
 }
 
@@ -340,7 +342,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     activeSpotlight,
     postPrayer,
     reactToPrayer,
-    updateProfile
+    updateProfile,
+    activeLyrics
   } = webrtc;
 
   // Find Pastor's stream in remoteStreams
@@ -811,6 +814,20 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                 {activeSpotlight.reference && (
                   <p className="spotlight-reference">— {activeSpotlight.reference}</p>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Lyrics Spotlight Overlay */}
+          {activeLyrics && (
+            <div className="scripture-spotlight-overlay" style={{ background: 'rgba(15, 23, 42, 0.9)', borderColor: '#e2a850' }}>
+              <div className="spotlight-content" style={{ maxWidth: '600px', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--primary-gold)', letterSpacing: '2px', fontWeight: 'bold', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                  🎵 Singing: {activeLyrics.title}
+                </span>
+                <p className="spotlight-text" style={{ fontSize: '1.4rem', fontWeight: 500, whiteSpace: 'pre-line', margin: 0, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                  {activeLyrics.text}
+                </p>
               </div>
             </div>
           )}

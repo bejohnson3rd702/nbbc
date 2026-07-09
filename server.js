@@ -189,6 +189,7 @@ const wss = new WebSocketServer({ server });
 const clients = new Map();
 let serviceActive = false;
 let currentSpotlight = null;
+let currentLyricsSpotlight = null;
 
 function broadcast(messageObj) {
   const data = JSON.stringify(messageObj);
@@ -256,6 +257,12 @@ wss.on('connection', (ws) => {
             scripture: currentSpotlight
           }));
 
+          // Send current lyrics spotlight state
+          ws.send(JSON.stringify({
+            type: 'spotlight-lyrics',
+            lyrics: currentLyricsSpotlight
+          }));
+
           broadcast({
             type: 'members-list',
             members: getActiveMembers()
@@ -300,6 +307,16 @@ wss.on('connection', (ws) => {
           broadcast({
             type: 'members-list',
             members: getActiveMembers()
+          });
+          break;
+        }
+
+        case 'spotlight-lyrics': {
+          const { lyrics } = msg;
+          currentLyricsSpotlight = lyrics;
+          broadcast({
+            type: 'spotlight-lyrics',
+            lyrics
           });
           break;
         }
