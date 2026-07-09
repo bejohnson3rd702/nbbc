@@ -33,9 +33,11 @@ const SIMULATED_MEMBERS = [
 
 interface ParticipantVideoProps {
   stream: MediaStream;
+  muted?: boolean;
+  style?: React.CSSProperties;
 }
 
-function ParticipantVideo({ stream }: ParticipantVideoProps) {
+function ParticipantVideo({ stream, muted, style }: ParticipantVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -49,7 +51,8 @@ function ParticipantVideo({ stream }: ParticipantVideoProps) {
       ref={videoRef}
       autoPlay 
       playsInline 
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      muted={muted}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }}
     />
   );
 }
@@ -672,17 +675,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                 {/* Local Member Card */}
                 <div className={`participant-card ${isCameraOn ? 'streaming' : ''}`}>
                   {isCameraOn && localStream ? (
-                    <video 
-                      ref={(el) => {
-                        if (el && localStream) {
-                          el.srcObject = localStream;
-                        }
-                      }}
-                      autoPlay 
-                      playsInline 
-                      muted 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-                    />
+                    <ParticipantVideo stream={localStream} muted={true} style={{ transform: 'scaleX(-1)' }} />
                   ) : (
                     <div className="participant-avatar-container">
                       <div className="participant-avatar">
@@ -770,13 +763,9 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
               borderRadius: '8px',
               border: '2px solid var(--primary-gold)'
             }}>
-              <video 
-                ref={localVideoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              {localStream && (
+                <ParticipantVideo stream={localStream} muted={true} style={{ transform: 'scaleX(-1)' }} />
+              )}
             </div>
           )}
 
