@@ -312,7 +312,6 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     }
   }, [activeTab]);
 
-  const pastorVideoRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -342,12 +341,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   const pastorObj = members.find(m => m.role === 'pastor');
   const pastorStream = pastorObj ? remoteStreams[pastorObj.email] : null;
 
-  // Set Pastor video stream
-  useEffect(() => {
-    if (pastorVideoRef.current && pastorStream) {
-      pastorVideoRef.current.srcObject = pastorStream;
-    }
-  }, [pastorStream]);
+
 
   // Set Local camera preview
   useEffect(() => {
@@ -617,11 +611,9 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
         <div className="video-stage">
           {isLive ? (
             hasPastorStream && serviceStatus === 'live' ? (
-              <video 
-                ref={pastorVideoRef} 
-                autoPlay 
-                playsInline 
-                className="stream-video"
+              <ParticipantVideo 
+                stream={pastorStream} 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             ) : (
               // Simulated Pulpit fallback visual
