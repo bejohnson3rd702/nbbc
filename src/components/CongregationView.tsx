@@ -311,17 +311,6 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'archive') {
-      fetchSermons();
-    } else if (activeTab === 'bible' && bibleVerses.length === 0) {
-      fetchBible(`${bibleBook} ${bibleChapter}`);
-    }
-  }, [activeTab]);
-
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const chatBottomRef = useRef<HTMLDivElement | null>(null);
-
   const {
     members,
     chatMessages,
@@ -345,6 +334,36 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     updateProfile,
     activeLyrics
   } = webrtc;
+
+  const [highlightedVerse, setHighlightedVerse] = useState<number | null>(null);
+
+  // Sync Bible to active scripture spotlight
+  useEffect(() => {
+    if (activeSpotlight && activeSpotlight.reference) {
+      const match = activeSpotlight.reference.match(/^(.+?)\s+(\d+):(\d+)/i);
+      if (match) {
+        const book = match[1];
+        const chapter = parseInt(match[2]);
+        const verse = parseInt(match[3]);
+
+        setBibleBook(book);
+        setBibleChapter(chapter);
+        setHighlightedVerse(verse);
+        fetchBible(`${book} ${chapter}`);
+      }
+    }
+  }, [activeSpotlight]);
+
+  useEffect(() => {
+    if (activeTab === 'archive') {
+      fetchSermons();
+    } else if (activeTab === 'bible' && bibleVerses.length === 0) {
+      fetchBible(`${bibleBook} ${bibleChapter}`);
+    }
+  }, [activeTab]);
+
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
   // Find Pastor's stream in remoteStreams
   const pastorObj = members.find(m => m.role === 'pastor');
@@ -989,8 +1008,23 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           <button 
             className={`sidebar-tab ${activeTab === 'bible' ? 'active' : ''}`}
             onClick={() => setActiveTab('bible')}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
           >
-            Bible
+            <span>Bible</span>
+            {activeSpotlight && activeSpotlight.reference && activeTab !== 'bible' && (
+              <span style={{ 
+                background: 'var(--primary-gold)', 
+                color: '#111726', 
+                fontSize: '0.6rem', 
+                fontWeight: 'bold', 
+                padding: '2px 6px', 
+                borderRadius: '10px', 
+                boxShadow: '0 0 8px var(--primary-gold)',
+                letterSpacing: '0.5px'
+              }}>
+                SYNCED
+              </span>
+            )}
           </button>
           <button 
             className={`sidebar-tab ${activeTab === 'giving' ? 'active' : ''}`}
@@ -1275,7 +1309,29 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontFamily: 'Georgia, serif', lineHeight: '1.7', fontSize: '0.95rem', color: '#f1f5f9' }}>
                   {bibleVerses.map((verse) => (
-                    <div key={verse.verse} style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '10px' }}>
+                    <div 
+                      key={verse.verse} 
+                      ref={(el) => {
+                        if (el && highlightedVerse === verse.verse) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      id={`verse-${verse.verse}`}
+                      style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '4px', 
+                        borderBottom: '1px solid rgba(255,255,255,0.03)', 
+                        paddingBottom: '10px',
+                        padding: highlightedVerse === verse.verse ? '10px' : '0',
+                        margin: highlightedVerse === verse.verse ? '4px 0' : '0',
+                        borderRadius: highlightedVerse === verse.verse ? '6px' : '0',
+                        background: highlightedVerse === verse.verse ? 'rgba(226,168,80,0.12)' : 'none',
+                        border: highlightedVerse === verse.verse ? '1.5px solid var(--primary-gold)' : 'none',
+                        boxShadow: highlightedVerse === verse.verse ? '0 0 10px rgba(226,168,80,0.15)' : 'none',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
                       <div>
                         <span style={{ color: 'var(--primary-gold)', fontWeight: 'bold', marginRight: '8px', fontFamily: 'var(--font-sans)', fontSize: '0.8rem' }}>
                           {verse.verse}
