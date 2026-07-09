@@ -390,11 +390,11 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       player = new (window as any).YT.Player('youtube-lobby-player', {
         height: '100%',
         width: '100%',
-        videoId: 'JmRBSeg85P4', // Kirk Franklin - I Smile (Official Lyric Video)
+        videoId: 'YQjPuIrR0Dk', // Kirk Franklin - Imagine Me (User Requested)
         playerVars: {
           autoplay: 1,
           loop: 1,
-          playlist: 'JmRBSeg85P4', // Required for loop to work
+          playlist: 'YQjPuIrR0Dk', // Required for loop to work
           controls: 1, // Let them control if they want
           rel: 0
         },
@@ -414,17 +414,16 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       });
     };
 
-    if ((window as any).YT && (window as any).YT.Player) {
-      initPlayer();
-    } else {
-      const previousReady = (window as any).onYouTubeIframeAPIReady;
-      (window as any).onYouTubeIframeAPIReady = () => {
-        if (previousReady) previousReady();
+    // Safe polling check to guarantee player initializes even after hot reloads or route changes
+    const checkInterval = setInterval(() => {
+      if ((window as any).YT && (window as any).YT.Player) {
         initPlayer();
-      };
-    }
+        clearInterval(checkInterval);
+      }
+    }, 100);
 
     return () => {
+      clearInterval(checkInterval);
       if (player) {
         try {
           player.destroy();
