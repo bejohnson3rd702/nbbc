@@ -657,3 +657,60 @@ body {
   }
 }
 
+/* Scripture Spotlight Overlay (Lower Third) */
+.scripture-spotlight-overlay {
+  position: absolute;
+  bottom: 80px;
+  left: 5%;
+  right: 5%;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.spotlight-content {
+  background: rgba(11, 15, 25, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid var(--primary-gold);
+  border-radius: 12px;
+  padding: 14px 24px;
+  max-width: 90%;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(226, 168, 80, 0.15);
+  text-align: center;
+}
+
+.spotlight-text {
+  font-family: var(--font-serif);
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.spotlight-reference {
+  font-family: var(--font-serif);
+  color: var(--primary-gold);
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 8px 0 0 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+@keyframes slideUpFade {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+

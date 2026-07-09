@@ -92,6 +92,148 @@ export default function useWebRTC(user: User | null) {
     }
   };
 
+  // Prayer Wall & Scripture Spotlight States
+  const [prayers, setPrayers] = useState<any[]>([]);
+  const [activeSpotlight, setActiveSpotlight] = useState<{ text: string; reference?: string } | null>(null);
+
+  const fetchPrayers = async () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const isSupabaseConfigured = !!(url && anonKey && 
+                                 !url.includes('placeholder-project') && 
+                                 !anonKey.includes('placeholder-anon-key'));
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('prayers')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        if (data) setPrayers(data);
+      } catch (e) {
+        console.error('Error fetching prayers from Supabase:', e);
+      }
+    } else {
+      try {
+        const response = await fetch(`${API_BASE}/api/prayers`);
+        if (response.ok) {
+          const data = await response.json();
+          setPrayers(data);
+        }
+      } catch (e) {
+        console.error('Error fetching prayers locally:', e);
+      }
+    }
+  };
+
+  const postPrayer = async (text: string) => {
+    if (!user) return;
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const isSupabaseConfigured = !!(url && anonKey && 
+                                 !url.includes('placeholder-project') && 
+                                 !anonKey.includes('placeholder-anon-key'));
+    try {
+      let newPrayer;
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from('prayers')
+          .insert({
+            sender: user.name,
+            text: text,
+            praying_count: 0
+          })
+          .select();
+        if (error) throw error;
+        newPrayer = data?.[0];
+      } else {
+        const response = await fetch(`${API_BASE}/api/prayers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sender: user.name, text })
+        });
+        if (response.ok) {
+          newPrayer = await response.json();
+        }
+      }
+
+      if (newPrayer) {
+        socketRef.current?.send(JSON.stringify({
+          type: 'prayer-post',
+          prayer: newPrayer
+        }));
+      }
+    } catch (e) {
+      console.error('Error posting prayer:', e);
+    }
+  };
+
+  const reactToPrayer = async (id: any) => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const isSupabaseConfigured = !!(url && anonKey && 
+                                 !url.includes('placeholder-project') && 
+                                 !anonKey.includes('placeholder-anon-key'));
+    try {
+      let updatedPrayer;
+      if (isSupabaseConfigured) {
+        const { data: current } = await supabase
+          .from('prayers')
+          .select('praying_count')
+          .eq('id', id)
+          .single();
+
+        const newCount = (current?.praying_count || 0) + 1;
+        const { data, error } = await supabase
+          .from('prayers')
+          .update({ praying_count: newCount })
+          .eq('id', id)
+          .select();
+        if (error) throw error;
+        updatedPrayer = data?.[0];
+      } else {
+        const response = await fetch(`${API_BASE}/api/prayers/${id}/react`, {
+          method: 'POST'
+        });
+        if (response.ok) {
+          updatedPrayer = await response.json();
+        }
+      }
+
+      if (updatedPrayer) {
+        socketRef.current?.send(JSON.stringify({
+          type: 'prayer-react',
+          id: updatedPrayer.id,
+          count: updatedPrayer.praying_count
+        }));
+      }
+    } catch (e) {
+      console.error('Error reacting to prayer:', e);
+    }
+  };
+
+  const sendPushAnnouncement = (title: string, text: string) => {
+    socketRef.current?.send(JSON.stringify({
+      type: 'push-announcement',
+      title,
+      text
+    }));
+  };
+
+  const spotlightScripture = (text: string, reference?: string) => {
+    socketRef.current?.send(JSON.stringify({
+      type: 'scripture-spotlight',
+      scripture: text ? { text, reference } : null
+    }));
+  };
+
+  // Request native notifications permission
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   const pcsRef = useRef<{ [email: string]: RTCPeerConnection }>({});
   const socketRef = useRef<WebSocket | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -398,6 +540,7 @@ export default function useWebRTC(user: User | null) {
         role: user.role
       }));
       fetchGivingSummary();
+      fetchPrayers();
     };
 
     ws.onmessage = async (event) => {
@@ -441,6 +584,39 @@ export default function useWebRTC(user: User | null) {
               }, 4000);
             }
           }
+          break;
+        }
+
+        case 'prayer-posted': {
+          setPrayers(prev => {
+            if (prev.some(p => p.id === msg.prayer.id)) return prev;
+            return [msg.prayer, ...prev];
+          });
+          break;
+        }
+
+        case 'prayer-reacted': {
+          setPrayers(prev => prev.map(p => {
+            if (p.id === msg.id) {
+              return { ...p, praying_count: msg.count };
+            }
+            return p;
+          }));
+          break;
+        }
+
+        case 'push-announcement': {
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(msg.title, {
+              body: msg.text,
+              icon: '/favicon.svg'
+            });
+          }
+          break;
+        }
+
+        case 'scripture-spotlight': {
+          setActiveSpotlight(msg.scripture);
           break;
         }
 
@@ -784,6 +960,12 @@ export default function useWebRTC(user: User | null) {
     givingToast,
     setGivingToast,
     fetchGivingSummary,
-    sendGivingUpdate
+    sendGivingUpdate,
+    prayers,
+    activeSpotlight,
+    postPrayer,
+    reactToPrayer,
+    sendPushAnnouncement,
+    spotlightScripture
   };
 }

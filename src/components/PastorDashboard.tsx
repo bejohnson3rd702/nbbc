@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { API_BASE } from '../lib/apiConfig';
+import { BIBLE_BOOKS } from '../data/bibleMetadata';
 
 interface MemberStatus {
   email: string;
@@ -43,6 +44,12 @@ interface PastorDashboardProps {
     toggleCamera: () => void;
     toggleMic: () => void;
     toggleService: (start: boolean) => void;
+    prayers: any[];
+    activeSpotlight: { text: string; reference?: string } | null;
+    postPrayer: (text: string) => void;
+    reactToPrayer: (id: any) => void;
+    sendPushAnnouncement: (title: string, text: string) => void;
+    spotlightScripture: (text: string, reference?: string) => void;
   };
 }
 
@@ -68,14 +75,43 @@ const SIMULATED_CHAT_TEXTS = [
 const SIMULATED_EMOJIS = ['🙏', '👏', '❤️', '🙌', '✨'];
 
 export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms' | 'spotlight'>('chat');
   const [chatInput, setChatInput] = useState('');
-  const [prayerWall, setPrayerWall] = useState<{ id: number; sender: string; text: string }[]>([
-    { id: 1, sender: 'Sister Beatrice', text: 'Prayers for my nephew who is traveling overseas.' },
-    { id: 2, sender: 'Brother Caleb', text: 'Thank you for praying for my recovery. The doctors say I am healing well.' }
-  ]);
   const [prayerInput, setPrayerInput] = useState('');
   const [simulationActive, setSimulationActive] = useState(false);
+
+  // Scripture Spotlight local UI states
+  const [spotlightBook, setSpotlightBook] = useState('John');
+  const [spotlightChapter, setSpotlightChapter] = useState(3);
+  const [spotlightVerses, setSpotlightVerses] = useState<any[]>([]);
+  const [customSpotlightText, setCustomSpotlightText] = useState('');
+  const [customSpotlightRef, setCustomSpotlightRef] = useState('');
+  const [loadingBible, setLoadingBible] = useState(false);
+  const [bibleError, setBibleError] = useState('');
+
+  const fetchBibleVerses = async (reference: string) => {
+    setLoadingBible(true);
+    setBibleError('');
+    try {
+      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}`);
+      if (!response.ok) {
+        throw new Error('Scripture reference not found.');
+      }
+      const data = await response.json();
+      setSpotlightVerses(data.verses || []);
+    } catch (err: any) {
+      setBibleError(err.message || 'Failed to load scripture.');
+      setSpotlightVerses([]);
+    } finally {
+      setLoadingBible(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'spotlight' && spotlightVerses.length === 0) {
+      fetchBibleVerses(`${spotlightBook} ${spotlightChapter}`);
+    }
+  }, [activeTab]);
   const [simulatedMembersList, setSimulatedMembersList] = useState<MemberStatus[]>([]);
   const [simulatedChats, setSimulatedChats] = useState<ChatMessage[]>([]);
   const [simulatedReactions, setSimulatedReactions] = useState<{ id: number; emoji: string }[]>([]);
@@ -233,7 +269,13 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     toggleService,
     givingTotal,
     givingTransactions,
-    givingToast
+    givingToast,
+    prayers,
+    activeSpotlight,
+    postPrayer,
+    reactToPrayer,
+    sendPushAnnouncement,
+    spotlightScripture
   } = webrtc;
 
   // Set local video stream
@@ -394,6 +436,12 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     ? [...reactions, ...simulatedReactions]
     : reactions;
 
+  // Filter prayers into Weekly Focus and Archive
+  const nowTime = Date.now();
+  const sevenDaysAgo = nowTime - 7 * 24 * 60 * 60 * 1000;
+  const weeklyPrayers = prayers.filter(p => !p.created_at || new Date(p.created_at).getTime() > sevenDaysAgo);
+  const archivedPrayers = prayers.filter(p => p.created_at && new Date(p.created_at).getTime() <= sevenDaysAgo);
+
   // Auto-scroll chat
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -463,12 +511,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
   const handlePostPrayer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prayerInput.trim()) return;
-    const newRequest = {
-      id: Date.now(),
-      sender: user.name,
-      text: prayerInput.trim()
-    };
-    setPrayerWall(prev => [newRequest, ...prev]);
+    postPrayer(prayerInput.trim());
     // Also post it to chat
     sendChatMessage(`[Prayer Request] ${prayerInput.trim()}`);
     setPrayerInput('');
@@ -663,6 +706,18 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
               {allMembers.length} Joined
             </div>
           </div>
+
+          {/* Scripture Spotlight Overlay */}
+          {activeSpotlight && (
+            <div className="scripture-spotlight-overlay">
+              <div className="spotlight-content">
+                <p className="spotlight-text">"{activeSpotlight.text}"</p>
+                {activeSpotlight.reference && (
+                  <p className="spotlight-reference">— {activeSpotlight.reference}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Congregation Grid */}
@@ -763,10 +818,16 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             Giving
           </button>
           <button 
+            className={`sidebar-tab ${activeTab === 'spotlight' ? 'active' : ''}`}
+            onClick={() => setActiveTab('spotlight')}
+          >
+            Spotlight
+          </button>
+          <button 
             className={`sidebar-tab ${activeTab === 'sms' ? 'active' : ''}`}
             onClick={() => setActiveTab('sms')}
           >
-            SMS
+            Alerts
           </button>
         </div>
 
@@ -817,18 +878,73 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
         {/* Prayer Wall Tab */}
         {activeTab === 'prayer' && (
           <>
-            <div className="prayer-requests">
-              {prayerWall.length === 0 ? (
+            <div className="prayer-requests" style={{ flex: 1, overflowY: 'auto' }}>
+              {weeklyPrayers.length > 0 && (
+                <div>
+                  <h5 style={{ color: 'var(--primary-gold)', fontSize: '0.85rem', margin: '0 0 10px 0', borderBottom: '1px solid rgba(226,168,80,0.2)', paddingBottom: '4px' }}>
+                    Weekly Focus (Recent)
+                  </h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {weeklyPrayers.map((req) => (
+                      <div key={req.id} className="prayer-card">
+                        <div className="prayer-meta">{req.sender}</div>
+                        <div className="prayer-text">{req.text}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {req.created_at ? new Date(req.created_at).toLocaleDateString() : 'Just now'}
+                          </span>
+                          <button 
+                            onClick={() => reactToPrayer(req.id)}
+                            className="btn btn-secondary" 
+                            style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <span>🙏 Praying for you</span>
+                            {req.praying_count > 0 && (
+                              <span style={{ color: 'var(--primary-gold)', fontWeight: 'bold' }}>({req.praying_count})</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {archivedPrayers.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h5 style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0 0 10px 0', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+                    Prayer Archive
+                  </h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {archivedPrayers.map((req) => (
+                      <div key={req.id} className="prayer-card" style={{ opacity: 0.75 }}>
+                        <div className="prayer-meta">{req.sender}</div>
+                        <div className="prayer-text">{req.text}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {req.created_at ? new Date(req.created_at).toLocaleDateString() : ''}
+                          </span>
+                          <button 
+                            onClick={() => reactToPrayer(req.id)}
+                            className="btn btn-secondary" 
+                            style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <span>🙏 Praying for you</span>
+                            {req.praying_count > 0 && (
+                              <span style={{ color: 'var(--primary-gold)', fontWeight: 'bold' }}>({req.praying_count})</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {weeklyPrayers.length === 0 && archivedPrayers.length === 0 && (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '40px', fontSize: '0.9rem' }}>
                   No prayer requests posted yet.
                 </div>
-              ) : (
-                prayerWall.map((req) => (
-                  <div key={req.id} className="prayer-card">
-                    <div className="prayer-meta">{req.sender}</div>
-                    <div className="prayer-text">{req.text}</div>
-                  </div>
-                ))
               )}
             </div>
 
@@ -900,10 +1016,186 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
           </div>
         )}
 
+        {/* Spotlight Tab */}
+        {activeTab === 'spotlight' && (
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
+              Scripture Spotlight
+            </h4>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Spotlight Bible verses or custom text overlays on everyone's live video stream.
+            </p>
+
+            {/* Current Active Spotlight */}
+            <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.2)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600 }}>CURRENTLY SPOTLIT:</span>
+              {activeSpotlight ? (
+                <div style={{ marginTop: '6px' }}>
+                  <p style={{ fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>"{activeSpotlight.text}"</p>
+                  {activeSpotlight.reference && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-gold)', margin: '4px 0 0 0', textAlign: 'right' }}>— {activeSpotlight.reference}</p>
+                  )}
+                  <button 
+                    onClick={() => spotlightScripture('', '')}
+                    className="btn btn-danger" 
+                    style={{ width: '100%', marginTop: '10px', padding: '6px' }}
+                  >
+                    Clear Spotlight
+                  </button>
+                </div>
+              ) : (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>Nothing is currently spotlit.</p>
+              )}
+            </div>
+
+            {/* Custom Spotlight Form */}
+            <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>CUSTOM STREAM OVERLAY</span>
+              <textarea 
+                className="form-input"
+                rows={2}
+                placeholder="Type a sermon point or notice (e.g. 'Welcome to NBBC!')"
+                value={customSpotlightText}
+                onChange={(e) => setCustomSpotlightText(e.target.value)}
+                style={{ resize: 'none', fontSize: '0.85rem' }}
+              />
+              <input 
+                type="text" 
+                className="form-input"
+                placeholder="Optional subtext (e.g. 'Announcement')"
+                value={customSpotlightRef}
+                onChange={(e) => setCustomSpotlightRef(e.target.value)}
+                style={{ fontSize: '0.85rem' }}
+              />
+              <button 
+                onClick={() => {
+                  if (customSpotlightText.trim()) {
+                    spotlightScripture(customSpotlightText.trim(), customSpotlightRef.trim());
+                    setCustomSpotlightText('');
+                    setCustomSpotlightRef('');
+                  }
+                }}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '6px' }}
+                disabled={!customSpotlightText.trim()}
+              >
+                Spotlight Custom Text
+              </button>
+            </div>
+
+            {/* Bible Verse Spotlight Browser */}
+            <div className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>BROWSE BIBLE TO SPOTLIGHT</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select 
+                  className="form-input"
+                  value={spotlightBook}
+                  onChange={(e) => {
+                    const newBook = e.target.value;
+                    setSpotlightBook(newBook);
+                    setSpotlightChapter(1);
+                    fetchBibleVerses(`${newBook} 1`);
+                  }}
+                  style={{ flex: 2, padding: '4px 8px', background: '#111726', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
+                >
+                  {BIBLE_BOOKS.map((b) => (
+                    <option key={b.name} value={b.name}>{b.name}</option>
+                  ))}
+                </select>
+
+                <select 
+                  className="form-input"
+                  value={spotlightChapter}
+                  onChange={(e) => {
+                    const newCh = parseInt(e.target.value);
+                    setSpotlightChapter(newCh);
+                    fetchBibleVerses(`${spotlightBook} ${newCh}`);
+                  }}
+                  style={{ flex: 1, padding: '4px 8px', background: '#111726', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
+                >
+                  {Array.from(
+                    { length: BIBLE_BOOKS.find(b => b.name === spotlightBook)?.chapters || 1 },
+                    (_, i) => (
+                      <option key={i + 1} value={i + 1}>{i + 1}</option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              {loadingBible ? (
+                <div style={{ textAlign: 'center', color: 'var(--primary-gold)', fontSize: '0.85rem', padding: '10px' }}>Loading scripture...</div>
+              ) : bibleError ? (
+                <div style={{ color: '#ef4444', fontSize: '0.8rem', textAlign: 'center' }}>{bibleError}</div>
+              ) : (
+                <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
+                  {spotlightVerses.map((v) => (
+                    <div 
+                      key={v.verse} 
+                      onClick={() => spotlightScripture(v.text, `${spotlightBook} ${spotlightChapter}:${v.verse}`)}
+                      style={{ 
+                        padding: '6px 8px', 
+                        background: 'rgba(255,255,255,0.02)', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer', 
+                        fontSize: '0.8rem',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(226,168,80,0.1)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                    >
+                      <strong style={{ color: 'var(--primary-gold)', marginRight: '6px' }}>{v.verse}</strong>
+                      {v.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* SMS Tab */}
         {activeTab === 'sms' && (
           <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
+            {/* Push Announcement Composer */}
+            <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.15)', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--primary-gold)', fontWeight: 600 }}>PUSH ANNOUNCEMENT (REAL-TIME POPUP)</span>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                Sends a native desktop/mobile alert instantly to all online members.
+              </p>
+              <input 
+                type="text"
+                id="push-title-input"
+                className="form-input"
+                placeholder="Alert Title (e.g. Service starting!)"
+                style={{ fontSize: '0.85rem', padding: '6px 10px' }}
+              />
+              <textarea 
+                id="push-text-input"
+                className="form-input"
+                rows={2}
+                placeholder="Alert Message (e.g. Tap to join the livestream now.)"
+                style={{ resize: 'none', fontSize: '0.85rem', padding: '6px 10px' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const titleEl = document.getElementById('push-title-input') as HTMLInputElement;
+                  const textEl = document.getElementById('push-text-input') as HTMLTextAreaElement;
+                  if (titleEl && textEl && textEl.value.trim()) {
+                    sendPushAnnouncement(titleEl.value.trim() || 'NBBC Sanctuary Alert', textEl.value.trim());
+                    titleEl.value = '';
+                    textEl.value = '';
+                    alert('Push alert sent!');
+                  }
+                }}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '8px' }}
+              >
+                Send Native Push Alert
+              </button>
+            </div>
+
+            <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
               SMS Broadcast Announcement
             </h4>
 

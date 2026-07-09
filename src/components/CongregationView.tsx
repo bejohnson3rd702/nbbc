@@ -47,6 +47,12 @@ interface CongregationViewProps {
     toggleCamera: () => void;
     toggleMic: () => void;
     sendGivingUpdate: (total: number, recentTransaction: any) => void;
+    prayers: any[];
+    activeSpotlight: { text: string; reference?: string } | null;
+    postPrayer: (text: string) => void;
+    reactToPrayer: (id: any) => void;
+    sendPushAnnouncement: (title: string, text: string) => void;
+    spotlightScripture: (text: string, reference?: string) => void;
   };
 }
 
@@ -79,12 +85,30 @@ const SIMULATED_CONGREGATION_CHATS = [
 export default function CongregationView({ user, onLogout, webrtc }: CongregationViewProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'archive' | 'bible' | 'giving'>('chat');
   const [chatInput, setChatInput] = useState('');
-  const [prayerWall, setPrayerWall] = useState<{ id: number; sender: string; text: string }[]>([
-    { id: 1, sender: 'Sister Beatrice', text: 'Prayers for my nephew who is traveling overseas.' },
-    { id: 2, sender: 'Brother Caleb', text: 'Thank you for praying for my recovery. The doctors say I am healing well.' }
-  ]);
   const [prayerInput, setPrayerInput] = useState('');
   const [demoServiceActive, setDemoServiceActive] = useState(false);
+
+  // PWA Install State
+  const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPromptEvent(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPromptEvent) return;
+    installPromptEvent.prompt();
+    const { outcome } = await installPromptEvent.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+    setInstallPromptEvent(null);
+  };
   const [simulatedChats, setSimulatedChats] = useState<ChatMessage[]>([]);
   const [simulatedReactions, setSimulatedReactions] = useState<{ id: number; emoji: string }[]>([]);
 
@@ -273,7 +297,11 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     toggleHandRaise,
     toggleCamera,
     toggleMic,
-    sendGivingUpdate
+    sendGivingUpdate,
+    prayers,
+    activeSpotlight,
+    postPrayer,
+    reactToPrayer
   } = webrtc;
 
   // Find Pastor's stream in remoteStreams
@@ -304,6 +332,12 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   const allReactions = demoServiceActive
     ? [...reactions, ...simulatedReactions]
     : reactions;
+
+  // Filter prayers into Weekly Focus and Archive
+  const nowTime = Date.now();
+  const sevenDaysAgo = nowTime - 7 * 24 * 60 * 60 * 1000;
+  const weeklyPrayers = prayers.filter(p => !p.created_at || new Date(p.created_at).getTime() > sevenDaysAgo);
+  const archivedPrayers = prayers.filter(p => p.created_at && new Date(p.created_at).getTime() <= sevenDaysAgo);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -362,12 +396,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   const handlePostPrayer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prayerInput.trim()) return;
-    const newRequest = {
-      id: Date.now(),
-      sender: user.name,
-      text: prayerInput.trim()
-    };
-    setPrayerWall(prev => [newRequest, ...prev]);
+    postPrayer(prayerInput.trim());
     // Also post it to chat
     sendChatMessage(`[Prayer Request] ${prayerInput.trim()}`);
     setPrayerInput('');
@@ -425,6 +454,15 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
               >
                 <Sparkles size={16} />
                 {demoServiceActive ? 'Disconnect Demo Service' : 'Simulate Live Service'}
+              </button>
+            )}
+            {installPromptEvent && (
+              <button 
+                className="btn btn-primary" 
+                onClick={handleInstallClick}
+                style={{ borderColor: 'var(--primary-gold)', color: 'var(--primary-gold)', background: 'rgba(226,168,80,0.1)' }}
+              >
+                Install App
               </button>
             )}
             <button className="btn btn-secondary" onClick={onLogout}>
@@ -561,8 +599,17 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                 muted 
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
-              <div style={{ position: 'absolute', bottom: '4px', left: '4px', fontSize: '0.65rem', background: 'rgba(0,0,0,0.6)', padding: '2px 4px', borderRadius: '2px' }}>
-                You
+            </div>
+          )}
+
+          {/* Scripture Spotlight Overlay */}
+          {activeSpotlight && (
+            <div className="scripture-spotlight-overlay">
+              <div className="spotlight-content">
+                <p className="spotlight-text">"{activeSpotlight.text}"</p>
+                {activeSpotlight.reference && (
+                  <p className="spotlight-reference">— {activeSpotlight.reference}</p>
+                )}
               </div>
             </div>
           )}
@@ -711,18 +758,73 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
         {/* Prayer Wall Tab */}
         {activeTab === 'prayer' && (
           <>
-            <div className="prayer-requests">
-              {prayerWall.length === 0 ? (
+            <div className="prayer-requests" style={{ flex: 1, overflowY: 'auto' }}>
+              {weeklyPrayers.length > 0 && (
+                <div>
+                  <h5 style={{ color: 'var(--primary-gold)', fontSize: '0.85rem', margin: '0 0 10px 0', borderBottom: '1px solid rgba(226,168,80,0.2)', paddingBottom: '4px' }}>
+                    Weekly Focus (Recent)
+                  </h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {weeklyPrayers.map((req) => (
+                      <div key={req.id} className="prayer-card">
+                        <div className="prayer-meta">{req.sender}</div>
+                        <div className="prayer-text">{req.text}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {req.created_at ? new Date(req.created_at).toLocaleDateString() : 'Just now'}
+                          </span>
+                          <button 
+                            onClick={() => reactToPrayer(req.id)}
+                            className="btn btn-secondary" 
+                            style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <span>🙏 Praying for you</span>
+                            {req.praying_count > 0 && (
+                              <span style={{ color: 'var(--primary-gold)', fontWeight: 'bold' }}>({req.praying_count})</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {archivedPrayers.length > 0 && (
+                <div style={{ marginTop: '20px' }}>
+                  <h5 style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0 0 10px 0', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '4px' }}>
+                    Prayer Archive
+                  </h5>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {archivedPrayers.map((req) => (
+                      <div key={req.id} className="prayer-card" style={{ opacity: 0.75 }}>
+                        <div className="prayer-meta">{req.sender}</div>
+                        <div className="prayer-text">{req.text}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {req.created_at ? new Date(req.created_at).toLocaleDateString() : ''}
+                          </span>
+                          <button 
+                            onClick={() => reactToPrayer(req.id)}
+                            className="btn btn-secondary" 
+                            style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <span>🙏 Praying for you</span>
+                            {req.praying_count > 0 && (
+                              <span style={{ color: 'var(--primary-gold)', fontWeight: 'bold' }}>({req.praying_count})</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {weeklyPrayers.length === 0 && archivedPrayers.length === 0 && (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '40px', fontSize: '0.9rem' }}>
                   No prayer requests posted yet.
                 </div>
-              ) : (
-                prayerWall.map((req) => (
-                  <div key={req.id} className="prayer-card">
-                    <div className="prayer-meta">{req.sender}</div>
-                    <div className="prayer-text">{req.text}</div>
-                  </div>
-                ))
               )}
             </div>
 

@@ -21,6 +21,42 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Local in-memory stores for fallback database mode
+let localPrayers = [
+  { id: 1, sender: 'Sister Beatrice', text: 'Prayers for my nephew who is traveling overseas.', created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), praying_count: 3 },
+  { id: 2, sender: 'Brother Caleb', text: 'Thank you for praying for my recovery. The doctors say I am healing well.', created_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), praying_count: 5 }
+];
+
+app.get('/api/prayers', (req, res) => {
+  res.json(localPrayers);
+});
+
+app.post('/api/prayers', (req, res) => {
+  const { sender, text } = req.body;
+  if (!sender || !text) {
+    return res.status(400).json({ error: 'Sender and text are required' });
+  }
+  const newPrayer = {
+    id: Date.now(),
+    sender,
+    text,
+    created_at: new Date().toISOString(),
+    praying_count: 0
+  };
+  localPrayers.unshift(newPrayer);
+  res.status(201).json(newPrayer);
+});
+
+app.post('/api/prayers/:id/react', (req, res) => {
+  const id = parseInt(req.params.id);
+  const prayer = localPrayers.find(p => p.id === id);
+  if (!prayer) {
+    return res.status(404).json({ error: 'Prayer not found' });
+  }
+  prayer.praying_count += 1;
+  res.json(prayer);
+});
+
 // Serve static files from the React build folder (dist) if it exists
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
@@ -61,6 +97,7 @@ const wss = new WebSocketServer({ server });
 // key: socket, value: { email, name, role, isStreaming, isMuted, handRaised }
 const clients = new Map();
 let serviceActive = false;
+let currentSpotlight = null;
 
 function broadcast(messageObj) {
   const data = JSON.stringify(messageObj);
@@ -116,6 +153,12 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({
             type: 'service-state',
             status: serviceActive ? 'live' : 'offline'
+          }));
+
+          // Send current scripture spotlight state
+          ws.send(JSON.stringify({
+            type: 'scripture-spotlight',
+            scripture: currentSpotlight
           }));
 
           broadcast({
@@ -257,6 +300,41 @@ wss.on('connection', (ws) => {
             type: 'giving-update',
             total: msg.total,
             recentTransaction: msg.recentTransaction
+          });
+          break;
+        }
+
+        case 'prayer-post': {
+          broadcast({
+            type: 'prayer-posted',
+            prayer: msg.prayer
+          });
+          break;
+        }
+
+        case 'prayer-react': {
+          broadcast({
+            type: 'prayer-reacted',
+            id: msg.id,
+            count: msg.count
+          });
+          break;
+        }
+
+        case 'push-announcement': {
+          broadcast({
+            type: 'push-announcement',
+            title: msg.title,
+            text: msg.text
+          });
+          break;
+        }
+
+        case 'scripture-spotlight': {
+          currentSpotlight = msg.scripture;
+          broadcast({
+            type: 'scripture-spotlight',
+            scripture: currentSpotlight
           });
           break;
         }
