@@ -7,7 +7,7 @@ import useWebRTC from './hooks/useWebRTC';
 interface User {
   name: string;
   email: string;
-  role: 'pastor' | 'member';
+  role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor';
 }
 
 function App() {

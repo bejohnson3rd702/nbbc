@@ -258,6 +258,18 @@ wss.on('connection', (ws) => {
           });
           break;
         }
+        case 'change-seat': {
+          const client = clients.get(ws);
+          if (client) {
+            client.role = msg.role;
+            console.log(`${client.name} moved seat to role: ${msg.role}`);
+            broadcast({
+              type: 'members-list',
+              members: getActiveMembers()
+            });
+          }
+          break;
+        }
 
         case 'signal': {
           const { target, signalData, sender } = msg;

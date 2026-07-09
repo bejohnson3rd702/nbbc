@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Send, LogOut, 
-  Hand, Sparkles, Volume2, BookOpen, Copy, Share2
+  Hand, Sparkles, Volume2, BookOpen, Copy, Share2, Users
 } from 'lucide-react';
 import { BIBLE_BOOKS } from '../data/bibleMetadata';
 import { supabase } from '../lib/supabaseClient';
@@ -10,7 +10,7 @@ import { API_BASE } from '../lib/apiConfig';
 interface MemberStatus {
   email: string;
   name: string;
-  role: 'pastor' | 'member';
+  role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor';
   isStreaming: boolean;
   isMuted: boolean;
   handRaised: boolean;
@@ -25,7 +25,7 @@ interface ChatMessage {
 }
 
 interface CongregationViewProps {
-  user: { name: string; email: string; role: 'pastor' | 'member' };
+  user: { name: string; email: string; role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor' };
   onLogout: () => void;
   webrtc: {
     members: MemberStatus[];
@@ -53,6 +53,7 @@ interface CongregationViewProps {
     reactToPrayer: (id: any) => void;
     sendPushAnnouncement: (title: string, text: string) => void;
     spotlightScripture: (text: string, reference?: string) => void;
+    changeSeat: (newRole: 'deacon' | 'choir' | 'member' | 'visitor') => void;
   };
 }
 
@@ -302,7 +303,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     prayers,
     activeSpotlight,
     postPrayer,
-    reactToPrayer
+    reactToPrayer,
+    changeSeat
   } = webrtc;
 
   // Find Pastor's stream in remoteStreams
@@ -415,6 +417,85 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     }
   };
 
+  const renderPewMemberCard = (member: MemberStatus) => {
+    const isMe = member.email === user.email;
+    const hasVideo = isMe 
+      ? (isCameraOn && localStream) 
+      : (member.isStreaming && remoteStreams[member.email]);
+    const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+    let badgeText = 'Member';
+    let badgeClass = 'role-badge-member';
+    if (member.role === 'deacon') {
+      badgeText = 'Deacon';
+      badgeClass = 'role-badge-deacon';
+    } else if (member.role === 'choir') {
+      badgeText = 'Choir';
+      badgeClass = 'role-badge-choir';
+    } else if (member.role === 'visitor') {
+      badgeText = 'Visitor';
+      badgeClass = 'role-badge-visitor';
+    }
+
+    return (
+      <div 
+        key={member.email} 
+        className="pew-member-card"
+        style={{
+          border: isMe ? '1.5px solid var(--primary-gold)' : '1px solid rgba(255,255,255,0.08)'
+        }}
+      >
+        <span className={`role-badge ${badgeClass}`}>
+          {badgeText}
+        </span>
+
+        {hasVideo ? (
+          <video 
+            ref={(el) => {
+              if (el) {
+                if (isMe && localStream) {
+                  el.srcObject = localStream;
+                } else if (!isMe && remoteStreams[member.email]) {
+                  el.srcObject = remoteStreams[member.email];
+                }
+              }
+            }}
+            autoPlay 
+            playsInline 
+            muted={isMe}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div className="participant-avatar-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="participant-avatar">{initials}</div>
+            {member.isStreaming && !isMe && (
+              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Connecting...
+              </span>
+            )}
+          </div>
+        )}
+
+        <span className="participant-name" style={{ fontSize: '0.7rem', padding: '2px 6px', bottom: '4px', left: '4px', background: 'rgba(0,0,0,0.6)', borderRadius: '3px' }}>
+          {member.name} {isMe && '(You)'}
+        </span>
+
+        <div className="participant-indicators">
+          {member.isMuted && (
+            <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '3px', borderRadius: '50%' }}>
+              <MicOff size={8} color="white" />
+            </div>
+          )}
+          {member.handRaised && (
+            <div style={{ background: 'var(--text-gold)', padding: '3px', borderRadius: '50%' }}>
+              <Hand size={8} color="black" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const hasPastorStream = pastorStream !== null;
 
   return (
@@ -456,6 +537,22 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                 <Sparkles size={16} />
                 {demoServiceActive ? 'Disconnect Demo Service' : 'Simulate Live Service'}
               </button>
+            )}
+            {isLive && (
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(226,168,80,0.2)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600 }}>Seat:</span>
+                <select 
+                  value={members.find(m => m.email === user.email)?.role || 'member'} 
+                  onChange={(e) => changeSeat(e.target.value as any)}
+                  className="form-input"
+                  style={{ width: '130px', padding: '2px 6px', fontSize: '0.75rem', borderRadius: '4px', background: 'transparent', color: 'white', border: 'none', cursor: 'pointer' }}
+                >
+                  <option value="member" style={{ background: '#111' }}>🪑 General Pew</option>
+                  <option value="choir" style={{ background: '#111' }}>🎵 Choir Loft</option>
+                  <option value="deacon" style={{ background: '#111' }}>🛡️ Deacon Bench</option>
+                  <option value="visitor" style={{ background: '#111' }}>🟢 Visitor Section</option>
+                </select>
+              </div>
             )}
             {installPromptEvent && (
               <button 
@@ -676,6 +773,75 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             </button>
           </div>
         </div>
+
+        {/* Virtual Sanctuary Seating Grid */}
+        {isLive && (
+          <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+            <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <Users size={20} />
+              Sanctuary Seating Pews
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>
+              See where everyone is seated in the Virtual Sanctuary. You can change your own pew seat from the dropdown menu in the top-right header!
+            </p>
+
+            <div className="pew-sanctuary" style={{ marginTop: '10px' }}>
+              {/* Choir Loft Row */}
+              <div>
+                <div className="pew-section-label">
+                  <span>🎵 Choir Loft</span>
+                </div>
+                <div className="pew-bench">
+                  {members.filter(m => m.role === 'choir').length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '10px 0' }}>
+                      Choir loft is empty.
+                    </div>
+                  ) : (
+                    <div className="pew-grid-container">
+                      {members.filter(m => m.role === 'choir').map(member => renderPewMemberCard(member))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Deacon Bench Row */}
+              <div>
+                <div className="pew-section-label">
+                  <span>🛡️ Deacon Bench</span>
+                </div>
+                <div className="pew-bench">
+                  {members.filter(m => m.role === 'deacon').length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '10px 0' }}>
+                      Deacon bench is empty.
+                    </div>
+                  ) : (
+                    <div className="pew-grid-container">
+                      {members.filter(m => m.role === 'deacon').map(member => renderPewMemberCard(member))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sanctuary Pews Row */}
+              <div>
+                <div className="pew-section-label">
+                  <span>🪑 Sanctuary Pews</span>
+                </div>
+                <div className="pew-bench">
+                  {members.filter(m => m.role === 'member' || m.role === 'visitor').length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '10px 0' }}>
+                      General pews are empty.
+                    </div>
+                  ) : (
+                    <div className="pew-grid-container">
+                      {members.filter(m => m.role === 'member' || m.role === 'visitor').map(member => renderPewMemberCard(member))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sidebar (Chat & Prayer board) */}
