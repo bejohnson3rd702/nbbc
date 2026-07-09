@@ -72,7 +72,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           // 2. Fetch profile from public.users table
           const { data: profile, error: profileError } = await supabase
             .from('users')
-            .select('name, email, role')
+            .select('name, email, role, bio, avatar_url')
             .eq('id', data.user.id)
             .single();
 
@@ -81,7 +81,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             const fallbackUser = {
               name: data.user.user_metadata?.name || 'Sanctuary Member',
               email: emailClean,
-              role: (data.user.user_metadata?.role || 'member') as 'pastor' | 'member'
+              role: (data.user.user_metadata?.role || 'member') as 'pastor' | 'member',
+              bio: '',
+              avatar_url: ''
             };
             localStorage.setItem('nbbc_user', JSON.stringify(fallbackUser));
             onAuthSuccess(fallbackUser);
@@ -89,7 +91,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             const loggedInUser = {
               name: profile.name,
               email: profile.email,
-              role: profile.role as 'pastor' | 'member'
+              role: profile.role as 'pastor' | 'member',
+              bio: profile.bio || '',
+              avatar_url: profile.avatar_url || ''
             };
             localStorage.setItem('nbbc_user', JSON.stringify(loggedInUser));
             onAuthSuccess(loggedInUser);
@@ -123,7 +127,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             email: emailClean,
             name: name.trim(),
             phone: phone.trim() || null,
-            role: userRole
+            role: userRole,
+            bio: '',
+            avatar_url: ''
           });
 
           if (profileError) throw profileError;
@@ -131,7 +137,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           const registeredUser = {
             name: name.trim(),
             email: emailClean,
-            role: userRole as 'pastor' | 'member'
+            role: userRole as 'pastor' | 'member',
+            bio: '',
+            avatar_url: ''
           };
           
           localStorage.setItem('nbbc_user', JSON.stringify(registeredUser));

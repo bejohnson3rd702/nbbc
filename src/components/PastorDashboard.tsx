@@ -6,6 +6,7 @@ import {
 import { supabase } from '../lib/supabaseClient';
 import { API_BASE } from '../lib/apiConfig';
 import { BIBLE_BOOKS } from '../data/bibleMetadata';
+import ProfileModal from './ProfileModal';
 
 interface MemberStatus {
   email: string;
@@ -14,6 +15,8 @@ interface MemberStatus {
   isStreaming: boolean;
   isMuted: boolean;
   handRaised: boolean;
+  bio?: string;
+  avatar_url?: string;
 }
 
 interface ParticipantVideoProps {
@@ -51,7 +54,7 @@ interface ChatMessage {
 }
 
 interface PastorDashboardProps {
-  user: { name: string; email: string; role: 'pastor' | 'member' };
+  user: { name: string; email: string; role: 'pastor' | 'member'; bio?: string; avatar_url?: string; };
   onLogout: () => void;
   webrtc: {
     members: MemberStatus[];
@@ -80,12 +83,14 @@ interface PastorDashboardProps {
     approveHandRaise: (memberEmail: string) => void;
     muteMember: (memberEmail: string) => void;
     revokeMemberMedia: (memberEmail: string) => void;
+    updateProfile: (name: string, bio: string, avatarUrl: string) => void;
+    updateRole: (email: string, role: string) => void;
   };
 }
 
 // Simulated data generator for high-fidelity testing
-const SIMULATED_MEMBERS = [
-  { email: 'beatrice@gmail.com', name: 'Sister Beatrice', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
+const SIMULATED_MEMBERS: MemberStatus[] = [
+  { email: 'beatrice@gmail.com', name: 'Sister Beatrice', role: 'member', isStreaming: false, isMuted: true, handRaised: false },
   { email: 'caleb@outlook.com', name: 'Brother Caleb', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
   { email: 'mary@nbbc.org', name: 'Sister Mary', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
   { email: 'david@yahoo.com', name: 'Brother David', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false }
@@ -105,8 +110,9 @@ const SIMULATED_CHAT_TEXTS = [
 const SIMULATED_EMOJIS = ['🙏', '👏', '❤️', '🙌', '✨'];
 
 export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms' | 'spotlight'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms' | 'spotlight' | 'admin'>('chat');
   const [chatInput, setChatInput] = useState('');
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [prayerInput, setPrayerInput] = useState('');
   const [simulationActive] = useState(false);
 
@@ -309,7 +315,9 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     sermonTimeline,
     approveHandRaise,
     muteMember,
-    revokeMemberMedia
+    revokeMemberMedia,
+    updateProfile,
+    updateRole
   } = webrtc;
 
   // Set local video stream
@@ -670,13 +678,40 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
       {/* Main Stream Area */}
       <div className="main-content">
         <div className="dashboard-header">
-          <div>
-            <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.6rem' }}>
-              Pastor Dashboard
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Logged in as <strong>{user.name}</strong> ({user.email})
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div 
+              onClick={() => setShowProfileModal(true)}
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '1.5px solid var(--primary-gold)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(15, 22, 38, 0.95)',
+                boxShadow: '0 0 10px rgba(226,168,80,0.15)'
+              }}
+              title="Edit Profile"
+            >
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', fontWeight: 600 }}>
+                  {user.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.6rem', margin: 0 }}>
+                Pastor Dashboard
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '2px 0 0 0' }}>
+                Logged in as <strong onClick={() => setShowProfileModal(true)} style={{ cursor: 'pointer', color: 'var(--primary-gold)', textDecoration: 'underline' }} title="Edit Profile">{user.name}</strong> ({user.email})
+              </p>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
 
@@ -829,7 +864,16 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                         <ParticipantVideo stream={remoteStreams[member.email]} muted={true} />
                       ) : (
                         <div className="participant-avatar-container">
-                          <div className="participant-avatar">{initials}</div>
+                          {member.avatar_url ? (
+                            <img 
+                              src={member.avatar_url} 
+                              alt={member.name} 
+                              style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-gold)' }} 
+                              title={`${member.name}: ${member.bio || 'No bio'}`}
+                            />
+                          ) : (
+                            <div className="participant-avatar">{initials}</div>
+                          )}
                           {member.isStreaming && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                               Connecting camera...
@@ -923,6 +967,12 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             onClick={() => setActiveTab('sms')}
           >
             Alerts
+          </button>
+          <button 
+            className={`sidebar-tab ${activeTab === 'admin' ? 'active' : ''}`}
+            onClick={() => setActiveTab('admin')}
+          >
+            Admin
           </button>
         </div>
 
@@ -1390,6 +1440,132 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             </div>
           </div>
         )}
+
+        {/* Admin Control Tab */}
+        {activeTab === 'admin' && (
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h4 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', margin: '0 0 4px 0', fontSize: '1.1rem' }}>
+              ⛪ Church Administration
+            </h4>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+              Manage registered congregation members and promote roles (Deacon, Choir, etc.) in real-time.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                Online & Registered Members ({members.length})
+              </span>
+              
+              {members.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px', fontSize: '0.8rem' }}>
+                  No members are currently online.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {members.map((member: any) => {
+                    const isPastorSelf = member.email === user.email;
+                    return (
+                      <div key={member.email} className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            border: '1px solid var(--primary-gold)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(255,255,255,0.02)'
+                          }}>
+                            {member.avatar_url ? (
+                              <img src={member.avatar_url} alt={member.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600 }}>
+                                {member.name.split(' ').map((n: string) => n[0]).join('').substring(0,2).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {member.name} {isPastorSelf && '(You)'}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {member.email}
+                            </span>
+                          </div>
+                        </div>
+
+                        {member.bio && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', background: 'rgba(255,255,255,0.01)', padding: '6px', borderRadius: '4px' }}>
+                            "{member.bio}"
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '8px', marginTop: '4px' }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--primary-gold)', textTransform: 'capitalize' }}>
+                            Role: <strong>{member.role}</strong>
+                          </span>
+                          
+                          {!isPastorSelf && (
+                            <select 
+                              value={member.role}
+                              onChange={async (e) => {
+                                const newRole = e.target.value as any;
+                                try {
+                                  await supabase.from('users').update({ role: newRole }).eq('email', member.email);
+                                  updateRole(member.email, newRole);
+                                } catch (err) {
+                                  console.error('Failed to change member role:', err);
+                                }
+                              }}
+                              style={{
+                                background: 'rgba(15, 23, 42, 0.9)',
+                                border: '1px solid rgba(226,168,80,0.3)',
+                                borderRadius: '4px',
+                                color: 'white',
+                                fontSize: '0.7rem',
+                                padding: '2px 6px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <option value="member">Member</option>
+                              <option value="choir">Choir Loft</option>
+                              <option value="deacon">Deacon Bench</option>
+                              <option value="visitor">Visitor</option>
+                              <option value="pastor">Pastor</option>
+                            </select>
+                          )}
+                        </div>
+
+                        {!isPastorSelf && (
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                            <button 
+                              type="button"
+                              onClick={() => muteMember(member.email)}
+                              className="btn btn-secondary"
+                              style={{ flex: 1, padding: '4px', fontSize: '0.65rem' }}
+                            >
+                              {member.isMuted ? 'Unmute Mic' : 'Mute Mic'}
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => revokeMemberMedia(member.email)}
+                              className="btn btn-danger"
+                              style={{ flex: 1, padding: '4px', fontSize: '0.65rem' }}
+                            >
+                              Revoke Media
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Upload Sermon Modal */}
@@ -1482,6 +1658,14 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             </form>
           </div>
         </div>
+      )}
+
+      {showProfileModal && (
+        <ProfileModal 
+          user={user} 
+          onClose={() => setShowProfileModal(false)} 
+          onUpdate={updateProfile} 
+        />
       )}
     </div>
   );

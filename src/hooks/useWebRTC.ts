@@ -6,6 +6,8 @@ interface User {
   name: string;
   email: string;
   role: 'pastor' | 'member';
+  bio?: string;
+  avatar_url?: string;
 }
 
 interface MemberStatus {
@@ -15,6 +17,8 @@ interface MemberStatus {
   isStreaming: boolean;
   isMuted: boolean;
   handRaised: boolean;
+  bio?: string;
+  avatar_url?: string;
 }
 
 interface ChatMessage {
@@ -576,7 +580,9 @@ export default function useWebRTC(user: User | null) {
         type: 'join',
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        bio: user.bio || '',
+        avatar_url: user.avatar_url || ''
       }));
       fetchGivingSummary();
       fetchPrayers();
@@ -671,6 +677,12 @@ export default function useWebRTC(user: User | null) {
               }
             ]);
           }
+          break;
+        }
+
+        case 'role-changed': {
+          console.log('Role changed to:', msg.role);
+          window.dispatchEvent(new CustomEvent('nbbc-role-changed', { detail: msg.role }));
           break;
         }
 
@@ -1067,6 +1079,27 @@ export default function useWebRTC(user: User | null) {
     }
   };
 
+  const updateProfile = (name: string, bio: string, avatarUrl: string) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'update-profile',
+        name,
+        bio,
+        avatar_url: avatarUrl
+      }));
+    }
+  };
+
+  const updateRole = (email: string, role: string) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'update-role',
+        email,
+        role
+      }));
+    }
+  };
+
   return {
     members,
     chatMessages,
@@ -1100,6 +1133,8 @@ export default function useWebRTC(user: User | null) {
     sendPushAnnouncement,
     spotlightScripture,
     sermonTimeline,
-    setSermonTimeline
+    setSermonTimeline,
+    updateProfile,
+    updateRole
   };
 }

@@ -215,7 +215,9 @@ function getActiveMembers() {
     role: c.role,
     isStreaming: c.isStreaming,
     isMuted: c.isMuted,
-    handRaised: c.handRaised
+    handRaised: c.handRaised,
+    bio: c.bio || '',
+    avatar_url: c.avatar_url || ''
   }));
 }
 
@@ -228,14 +230,16 @@ wss.on('connection', (ws) => {
 
       switch (msg.type) {
         case 'join': {
-          const { email, name, role } = msg;
+          const { email, name, role, bio, avatar_url } = msg;
           clients.set(ws, {
             email,
             name,
             role,
             isStreaming: false,
             isMuted: true,
-            handRaised: false
+            handRaised: false,
+            bio: bio || '',
+            avatar_url: avatar_url || ''
           });
 
           console.log(`${name} (${role}) joined`);
@@ -251,6 +255,47 @@ wss.on('connection', (ws) => {
             type: 'scripture-spotlight',
             scripture: currentSpotlight
           }));
+
+          broadcast({
+            type: 'members-list',
+            members: getActiveMembers()
+          });
+          break;
+        }
+
+        case 'update-profile': {
+          const { name, bio, avatar_url } = msg;
+          const client = clients.get(ws);
+          if (client) {
+            client.name = name;
+            client.bio = bio || '';
+            client.avatar_url = avatar_url || '';
+            console.log(`User ${client.email} updated profile: ${name}`);
+
+            broadcast({
+              type: 'members-list',
+              members: getActiveMembers()
+            });
+          }
+          break;
+        }
+
+        case 'update-role': {
+          const { email, role } = msg;
+          let targetWs = null;
+          clients.forEach((clientInfo, ws) => {
+            if (clientInfo.email === email) {
+              clientInfo.role = role;
+              targetWs = ws;
+            }
+          });
+
+          if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(JSON.stringify({
+              type: 'role-changed',
+              role
+            }));
+          }
 
           broadcast({
             type: 'members-list',

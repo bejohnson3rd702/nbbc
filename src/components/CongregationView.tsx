@@ -4,6 +4,7 @@ import {
   Hand, Sparkles, Volume2, BookOpen, Copy, Share2, Users
 } from 'lucide-react';
 import { BIBLE_BOOKS } from '../data/bibleMetadata';
+import ProfileModal from './ProfileModal';
 import { supabase } from '../lib/supabaseClient';
 import { API_BASE } from '../lib/apiConfig';
 
@@ -14,6 +15,8 @@ interface MemberStatus {
   isStreaming: boolean;
   isMuted: boolean;
   handRaised: boolean;
+  bio?: string;
+  avatar_url?: string;
 }
 
 interface ChatMessage {
@@ -24,8 +27,8 @@ interface ChatMessage {
   timestamp: string;
 }
 
-const SIMULATED_MEMBERS = [
-  { email: 'pastor@nbbc.org', name: 'Pastor Thomas', role: 'pastor' as const, isStreaming: true, isMuted: false, handRaised: false },
+const SIMULATED_MEMBERS: MemberStatus[] = [
+  { email: 'pastor@nbbc.org', name: 'Pastor Thomas', role: 'pastor', isStreaming: true, isMuted: false, handRaised: false },
   { email: 'beatrice@gmail.com', name: 'Sister Beatrice', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
   { email: 'caleb@outlook.com', name: 'Brother Caleb', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
   { email: 'mary@nbbc.org', name: 'Sister Mary', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false }
@@ -58,7 +61,7 @@ function ParticipantVideo({ stream, muted, style }: ParticipantVideoProps) {
 }
 
 interface CongregationViewProps {
-  user: { name: string; email: string; role: 'pastor' | 'member' };
+  user: { name: string; email: string; role: 'pastor' | 'member'; bio?: string; avatar_url?: string; };
   onLogout: () => void;
   webrtc: {
     members: MemberStatus[];
@@ -86,6 +89,7 @@ interface CongregationViewProps {
     reactToPrayer: (id: any) => void;
     sendPushAnnouncement: (title: string, text: string) => void;
     spotlightScripture: (text: string, reference?: string) => void;
+    updateProfile: (name: string, bio: string, avatarUrl: string) => void;
   };
 }
 
@@ -120,6 +124,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   const [chatInput, setChatInput] = useState('');
   const [prayerInput, setPrayerInput] = useState('');
   const [demoServiceActive] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // PWA Install State
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
@@ -334,7 +339,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     prayers,
     activeSpotlight,
     postPrayer,
-    reactToPrayer
+    reactToPrayer,
+    updateProfile
   } = webrtc;
 
   // Find Pastor's stream in remoteStreams
@@ -581,13 +587,40 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       {/* Main Sanctuary Feed Area */}
       <div className="main-content">
         <div className="dashboard-header">
-          <div>
-            <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.6rem' }}>
-              Virtual Sanctuary
-            </h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Welcome back, <strong>{user.name}</strong>
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div 
+              onClick={() => setShowProfileModal(true)}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '1.5px solid var(--primary-gold)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(15, 22, 38, 0.95)',
+                boxShadow: '0 0 10px rgba(226,168,80,0.15)'
+              }}
+              title="Edit Profile"
+            >
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', fontWeight: 600 }}>
+                  {user.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.6rem', margin: 0 }}>
+                Virtual Sanctuary
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '2px 0 0 0' }}>
+                Welcome back, <strong onClick={() => setShowProfileModal(true)} style={{ cursor: 'pointer', color: 'var(--primary-gold)', textDecoration: 'underline' }} title="Edit Profile">{user.name}</strong>
+              </p>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
 
@@ -661,9 +694,18 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                     <ParticipantVideo stream={localStream} muted={true} style={{ transform: 'scaleX(-1)' }} />
                   ) : (
                     <div className="participant-avatar-container">
-                      <div className="participant-avatar">
-                        {user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                      </div>
+                      {user.avatar_url ? (
+                        <img 
+                          src={user.avatar_url} 
+                          alt={user.name} 
+                          style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-gold)' }} 
+                          title={`${user.name}: ${user.bio || 'No bio'}`}
+                        />
+                      ) : (
+                        <div className="participant-avatar">
+                          {user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
                     </div>
                   )}
                   <span className="participant-name">{user.name} (You)</span>
@@ -692,7 +734,16 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                           <ParticipantVideo stream={remoteStreams[member.email]} muted={true} />
                         ) : (
                           <div className="participant-avatar-container">
-                            <div className="participant-avatar">{initials}</div>
+                            {member.avatar_url ? (
+                              <img 
+                                src={member.avatar_url} 
+                                alt={member.name} 
+                                style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-gold)' }} 
+                                title={`${member.name}: ${member.bio || 'No bio'}`}
+                              />
+                            ) : (
+                              <div className="participant-avatar">{initials}</div>
+                            )}
                             {member.isStreaming && (
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                 Connecting camera...
@@ -858,7 +909,16 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                           <ParticipantVideo stream={remoteStreams[member.email]} muted={true} />
                         ) : (
                           <div className="participant-avatar-container">
-                            <div className="participant-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>{initials}</div>
+                            {member.avatar_url ? (
+                              <img 
+                                src={member.avatar_url} 
+                                alt={member.name} 
+                                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--primary-gold)' }} 
+                                title={`${member.name}: ${member.bio || 'No bio'}`}
+                              />
+                            ) : (
+                              <div className="participant-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>{initials}</div>
+                            )}
                             {member.isStreaming && (
                               <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
                                 Connecting...
@@ -1606,6 +1666,13 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             </div>
           </div>
         </div>
+      )}
+      {showProfileModal && (
+        <ProfileModal 
+          user={user} 
+          onClose={() => setShowProfileModal(false)} 
+          onUpdate={updateProfile} 
+        />
       )}
     </div>
   );

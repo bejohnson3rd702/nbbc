@@ -8,6 +8,8 @@ interface User {
   name: string;
   email: string;
   role: 'pastor' | 'member';
+  bio?: string;
+  avatar_url?: string;
 }
 
 function App() {
@@ -26,6 +28,32 @@ function App() {
       }
     }
     setLoading(false);
+  }, []);
+
+  // Listen for real-time role changes from signaling
+  useEffect(() => {
+    const handleRoleChanged = (e: Event) => {
+      const newRole = (e as CustomEvent).detail;
+      setUser(prev => {
+        if (!prev) return null;
+        const updated = { ...prev, role: newRole };
+        localStorage.setItem('nbbc_user', JSON.stringify(updated));
+        return updated;
+      });
+    };
+    window.addEventListener('nbbc-role-changed', handleRoleChanged);
+    return () => window.removeEventListener('nbbc-role-changed', handleRoleChanged);
+  }, []);
+
+  // Listen for local profile updates
+  useEffect(() => {
+    const handleProfileUpdated = (e: Event) => {
+      const updatedUser = (e as CustomEvent).detail;
+      setUser(updatedUser);
+      localStorage.setItem('nbbc_user', JSON.stringify(updatedUser));
+    };
+    window.addEventListener('nbbc-profile-updated', handleProfileUpdated);
+    return () => window.removeEventListener('nbbc-profile-updated', handleProfileUpdated);
   }, []);
 
   const handleLogout = () => {
