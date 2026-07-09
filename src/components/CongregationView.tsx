@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Send, LogOut, 
-  Hand, Sparkles, Volume2, BookOpen, Copy, Share2
+  Hand, Sparkles, Volume2, BookOpen, Copy, Share2, Users
 } from 'lucide-react';
 import { BIBLE_BOOKS } from '../data/bibleMetadata';
 import { supabase } from '../lib/supabaseClient';
@@ -23,6 +23,13 @@ interface ChatMessage {
   text: string;
   timestamp: string;
 }
+
+const SIMULATED_MEMBERS = [
+  { email: 'pastor@nbbc.org', name: 'Pastor Thomas', role: 'pastor' as const, isStreaming: true, isMuted: false, handRaised: false },
+  { email: 'beatrice@gmail.com', name: 'Sister Beatrice', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
+  { email: 'caleb@outlook.com', name: 'Brother Caleb', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
+  { email: 'mary@nbbc.org', name: 'Sister Mary', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false }
+];
 
 interface CongregationViewProps {
   user: { name: string; email: string; role: 'pastor' | 'member' };
@@ -83,7 +90,7 @@ const SIMULATED_CONGREGATION_CHATS = [
 ];
 
 export default function CongregationView({ user, onLogout, webrtc }: CongregationViewProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'archive' | 'bible' | 'giving'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'archive' | 'bible' | 'giving' | 'members'>('chat');
   const [chatInput, setChatInput] = useState('');
   const [prayerInput, setPrayerInput] = useState('');
   const [demoServiceActive, setDemoServiceActive] = useState(false);
@@ -325,6 +332,10 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
 
   // Combine real and simulated state
   const isLive = serviceStatus === 'live' || demoServiceActive;
+
+  const allMembers = demoServiceActive
+    ? [...members, ...SIMULATED_MEMBERS.filter(sm => !members.some(m => m.email === sm.email))]
+    : members;
 
   const allChats = demoServiceActive
     ? [...chatMessages, ...simulatedChats].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
@@ -710,6 +721,12 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             onClick={() => setActiveTab('giving')}
           >
             Giving
+          </button>
+          <button 
+            className={`sidebar-tab ${activeTab === 'members' ? 'active' : ''}`}
+            onClick={() => setActiveTab('members')}
+          >
+            Members
           </button>
         </div>
 
@@ -1184,6 +1201,100 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                   {givingLoading ? 'Processing Offering...' : `Process Gift of $${givingAmount ? parseFloat(givingAmount).toFixed(2) : '0.00'}`}
                 </button>
               </form>
+            )}
+          </div>
+        )}
+
+        {/* Members (Online) Tab */}
+        {activeTab === 'members' && (
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={20} />
+              Online Congregation ({allMembers.length})
+            </h4>
+            
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', margin: '0' }}>
+              These are the active believers and visitors gathered in the sanctuary.
+            </p>
+
+            {allMembers.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px', fontSize: '0.85rem' }}>
+                No other members are online.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {allMembers.map((m) => {
+                  const initials = m.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                  const isSelf = m.email === user?.email;
+                  return (
+                    <div 
+                      key={m.email} 
+                      className="glass-panel" 
+                      style={{ 
+                        padding: '10px 12px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        borderLeft: isSelf ? '3px solid var(--primary-gold)' : '1px solid rgba(255,255,255,0.05)',
+                        background: isSelf ? 'rgba(226,168,80,0.03)' : 'rgba(255,255,255,0.01)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ 
+                          width: '32px', 
+                          height: '32px', 
+                          borderRadius: '50%', 
+                          background: m.role === 'pastor' ? 'linear-gradient(135deg, #ffd700, #b8860b)' : 'rgba(255,255,255,0.05)', 
+                          border: m.role === 'pastor' ? '1px solid #ffd700' : '1px solid rgba(255,255,255,0.1)',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: m.role === 'pastor' ? '#0b0f19' : 'white'
+                        }}>
+                          {initials}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                            {m.name} {isSelf && <span style={{ color: 'var(--primary-gold)', fontSize: '0.7rem', fontWeight: 'normal' }}>(You)</span>}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {m.role === 'pastor' ? '👑 Pastor at the Pulpit' : '🪑 Congregation Member'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {m.isStreaming && (
+                          <span style={{ 
+                            fontSize: '0.65rem', 
+                            background: 'rgba(34, 197, 94, 0.15)', 
+                            color: '#4ade80', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px',
+                            border: '1px solid rgba(34, 197, 94, 0.25)'
+                          }}>
+                            🎥 Camera On
+                          </span>
+                        )}
+                        {!m.isMuted && (
+                          <span style={{ 
+                            fontSize: '0.65rem', 
+                            background: 'rgba(234, 179, 8, 0.15)', 
+                            color: '#facc15', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px',
+                            border: '1px solid rgba(234, 179, 8, 0.25)'
+                          }}>
+                            🎤 Mic On
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
