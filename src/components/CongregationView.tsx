@@ -119,7 +119,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'archive' | 'bible' | 'giving' | 'members'>('chat');
   const [chatInput, setChatInput] = useState('');
   const [prayerInput, setPrayerInput] = useState('');
-  const [demoServiceActive, setDemoServiceActive] = useState(false);
+  const [demoServiceActive] = useState(false);
 
   // PWA Install State
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
@@ -597,16 +597,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {serviceStatus === 'offline' && (
-              <button 
-                className={`btn ${demoServiceActive ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setDemoServiceActive(!demoServiceActive)}
-                title="Simulates a live service when no Pastor is broadcasting."
-              >
-                <Sparkles size={16} />
-                {demoServiceActive ? 'Disconnect Demo Service' : 'Simulate Live Service'}
-              </button>
-            )}
+
             {installPromptEvent && (
               <button 
                 className="btn btn-primary" 
