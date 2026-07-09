@@ -691,20 +691,83 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           )}
         </div>
 
-        {/* Congregation Camera Feeds (visible during live service) */}
+        {/* Interaction Panel (Media Controls & Emojis combined in a grid) */}
         {isLive && (
-          <div className="glass-panel" style={{ padding: '20px', marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              <Users size={20} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '20px', marginTop: '10px' }} className="mobile-stack">
+            {/* Participation Controls */}
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'space-between' }}>
+              <div>
+                <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', fontSize: '1rem', letterSpacing: '0.5px' }}>
+                  Participation Controls
+                </h4>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', lineHeight: '1.4' }}>
+                  Click \"Raise Hand\" to ask to speak, or toggle your webcam and microphone below.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                <button 
+                  className={`btn ${handRaised ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={toggleHandRaise}
+                  style={{ flex: 1, minWidth: '100px', padding: '10px' }}
+                >
+                  <Hand size={18} />
+                  {handRaised ? 'Lower Hand' : 'Raise Hand'}
+                </button>
+                <button 
+                  className={`btn ${isCameraOn ? 'btn-secondary' : 'btn-primary'}`} 
+                  onClick={toggleCamera}
+                  style={{ flex: 1, minWidth: '100px', padding: '10px' }}
+                >
+                  {isCameraOn ? <VideoOff size={18} /> : <Video size={18} />}
+                  {isCameraOn ? 'Cam Off' : 'Cam On'}
+                </button>
+                <button 
+                  className={`btn ${isMicOn ? 'btn-secondary' : 'btn-primary'}`} 
+                  onClick={toggleMic}
+                  style={{ flex: 1, minWidth: '100px', padding: '10px' }}
+                >
+                  {isMicOn ? <MicOff size={18} /> : <Mic size={18} />}
+                  {isMicOn ? 'Mute' : 'Unmute'}
+                </button>
+              </div>
+            </div>
+
+            {/* Worship Reactions */}
+            <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', fontSize: '1rem', letterSpacing: '0.5px' }}>
+                Worship Reactions (Send to Stream)
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px' }}>
+                {EMOJI_REACTIONS.map((react) => (
+                  <button 
+                    key={react.label}
+                    className="btn btn-secondary" 
+                    onClick={() => handleReactionClick(react.emoji)}
+                    style={{ fontSize: '1.1rem', padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', borderRadius: '8px' }}
+                  >
+                    <span>{react.emoji}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{react.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Congregation Camera Feeds Horizontal Filmstrip */}
+        {isLive && (
+          <div className="glass-panel" style={{ padding: '20px', marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <Users size={18} />
               Congregation Camera Feeds ({allMembers.filter(m => m.role === 'member').length})
             </h3>
             
             {allMembers.filter(m => m.role === 'member').length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px 0', textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', padding: '12px 0', textAlign: 'center' }}>
                 No congregation members have joined the sanctuary yet.
               </div>
             ) : (
-              <div className="participant-grid">
+              <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', paddingBottom: '8px', scrollbarWidth: 'thin' }}>
                 {allMembers
                   .filter(m => m.role === 'member')
                   .map((member) => {
@@ -715,29 +778,30 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                       <div 
                         key={member.email} 
                         className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
+                        style={{ flex: '0 0 150px', aspectRatio: '4/3', margin: 0 }}
                       >
                         {hasVideo ? (
                           <ParticipantVideo stream={remoteStreams[member.email]} />
                         ) : (
                           <div className="participant-avatar-container">
-                            <div className="participant-avatar">{initials}</div>
+                            <div className="participant-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>{initials}</div>
                             {member.isStreaming && (
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                Connecting camera...
+                              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                                Connecting...
                               </span>
                             )}
                           </div>
                         )}
-                        <span className="participant-name">{member.name}</span>
+                        <span className="participant-name" style={{ fontSize: '0.75rem', padding: '3px 6px' }}>{member.name}</span>
                         <div className="participant-indicators">
                           {member.isMuted && (
-                            <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%' }}>
-                              <MicOff size={10} color="white" />
+                            <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '3px', borderRadius: '50%' }}>
+                              <MicOff size={8} color="white" />
                             </div>
                           )}
                           {member.handRaised && (
-                            <div style={{ background: 'var(--text-gold)', padding: '4px', borderRadius: '50%' }}>
-                              <Hand size={10} color="black" />
+                            <div style={{ background: 'var(--text-gold)', padding: '3px', borderRadius: '50%' }}>
+                              <Hand size={8} color="black" />
                             </div>
                           )}
                         </div>
@@ -748,67 +812,6 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             )}
           </div>
         )}
-
-        {/* Interactive Emojis panel */}
-        {isLive && (
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h4 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1rem', letterSpacing: '0.5px' }}>
-              Worship Reactions (Send to Stream)
-            </h4>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              {EMOJI_REACTIONS.map((react) => (
-                <button 
-                  key={react.label}
-                  className="btn btn-secondary" 
-                  onClick={() => handleReactionClick(react.emoji)}
-                  style={{ fontSize: '1.2rem', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  <span>{react.emoji}</span>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{react.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Member Media Controls and Status Info */}
-        <div className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h4 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Participation Controls</h4>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }}>
-              You have control over your camera and microphone. Click "Raise Hand" to notify the Pastor if you would like to speak or ask a question.
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {isLive && (
-              <button 
-                className={`btn ${handRaised ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={toggleHandRaise}
-              >
-                <Hand size={18} />
-                {handRaised ? 'Lower Hand' : 'Raise Hand'}
-              </button>
-            )}
-
-            <button 
-              className={`btn ${isCameraOn ? 'btn-secondary' : 'btn-primary'}`} 
-              onClick={toggleCamera}
-            >
-              {isCameraOn ? <VideoOff size={18} /> : <Video size={18} />}
-              {isCameraOn ? 'Camera Off' : 'Camera On'}
-            </button>
-
-
-            <button 
-              className={`btn ${isMicOn ? 'btn-secondary' : 'btn-primary'}`} 
-              onClick={toggleMic}
-            >
-              {isMicOn ? <MicOff size={18} /> : <Mic size={18} />}
-              {isMicOn ? 'Mute Mic' : 'Unmute Mic'}
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Sidebar (Chat & Prayer board) */}
