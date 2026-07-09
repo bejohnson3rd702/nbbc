@@ -16,6 +16,29 @@ interface MemberStatus {
   handRaised: boolean;
 }
 
+interface ParticipantVideoProps {
+  stream: MediaStream;
+}
+
+function ParticipantVideo({ stream }: ParticipantVideoProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <video 
+      ref={videoRef}
+      autoPlay 
+      playsInline 
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    />
+  );
+}
+
 interface ChatMessage {
   senderName: string;
   senderEmail: string;
@@ -769,16 +792,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                       className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
                     >
                       {hasVideo ? (
-                        <video 
-                          ref={(el) => {
-                            if (el && remoteStreams[member.email]) {
-                              el.srcObject = remoteStreams[member.email];
-                            }
-                          }}
-                          autoPlay 
-                          playsInline 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                        <ParticipantVideo stream={remoteStreams[member.email]} />
                       ) : (
                         <div className="participant-avatar-container">
                           <div className="participant-avatar">{initials}</div>
