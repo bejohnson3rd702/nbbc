@@ -148,6 +148,49 @@ Please format the response in clean Markdown (without wrapping it in markdown co
   res.json({ notes: markdown });
 });
 
+app.post('/api/find-lyrics', async (req, res) => {
+  const { title, author } = req.body;
+  if (!title) {
+    return res.status(400).json({ error: 'Song title is required' });
+  }
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    return res.status(500).json({ error: 'Gemini API key is not configured.' });
+  }
+
+  try {
+    console.log(`Searching lyrics for "${title}" by "${author || 'unknown'}" using Gemini API...`);
+    
+    const prompt = `You are a church worship assistant. Retrieve the complete, accurate lyrics for the worship song/hymn titled "${title}"${author ? ` by ${author}` : ''}.
+Please format the response ONLY as the raw song text, separating each distinct verse, chorus, bridge, or slide segment with a blank line (double newline). 
+Do NOT include any introduction, explanations, metadata, markdown titles, or code block formatting ticks (like \`\`\` or \`\`\`text). Return ONLY the formatted lyrics.`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gemini API returned error: ${response.statusText}`);
+    }
+
+    const resData = await response.json();
+    let lyrics = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    // Clean up any markdown code block ticks if Gemini accidentally returned them
+    lyrics = lyrics.replace(/```text/g, '').replace(/```/g, '').trim();
+    
+    res.json({ lyrics });
+  } catch (err) {
+    console.error('Failed to find lyrics using Gemini API:', err);
+    res.status(500).json({ error: 'Failed to retrieve lyrics using AI. Please try pasting them manually.' });
+  }
+});
+
 // Serve static files from the React build folder (dist) if it exists
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Video, VideoOff, Mic, MicOff, Send, Users, 
-  LogOut, Radio, Hand, BookOpen
+  LogOut, Radio, Hand, BookOpen, Sparkles
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { API_BASE } from '../lib/apiConfig';
@@ -361,6 +361,46 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
   const [newSongTitle, setNewSongTitle] = useState('');
   const [newSongAuthor, setNewSongAuthor] = useState('');
   const [newSongLyrics, setNewSongLyrics] = useState('');
+  const [searchingLyrics, setSearchingLyrics] = useState(false);
+  const [lyricsError, setLyricsError] = useState('');
+
+  const handleSearchLyricsWithAI = async () => {
+    if (!newSongTitle.trim()) {
+      alert('Please enter a song title first.');
+      return;
+    }
+
+    setSearchingLyrics(true);
+    setLyricsError('');
+
+    try {
+      const response = await fetch(`${API_BASE}/api/find-lyrics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newSongTitle.trim(),
+          author: newSongAuthor.trim()
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to search lyrics.');
+      }
+
+      const data = await response.json();
+      if (data.lyrics) {
+        setNewSongLyrics(data.lyrics);
+      } else {
+        throw new Error('No lyrics were returned by the AI.');
+      }
+    } catch (err: any) {
+      console.error('Failed to search lyrics with AI:', err);
+      setLyricsError(err.message || 'Lyrics lookup failed. Please enter lyrics manually.');
+    } finally {
+      setSearchingLyrics(false);
+    }
+  };
 
   const fetchSongs = async () => {
     try {
@@ -1507,6 +1547,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                         onChange={(e) => setNewSongTitle(e.target.value)} 
                         placeholder="e.g. Amazing Grace"
                         required 
+                        disabled={searchingLyrics}
                       />
                     </div>
 
@@ -1518,8 +1559,26 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                         value={newSongAuthor} 
                         onChange={(e) => setNewSongAuthor(e.target.value)} 
                         placeholder="e.g. John Newton"
+                        disabled={searchingLyrics}
                       />
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSearchLyricsWithAI}
+                      className="btn btn-secondary"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.75rem', padding: '6px' }}
+                      disabled={searchingLyrics || !newSongTitle.trim()}
+                    >
+                      <Sparkles size={14} color="var(--primary-gold)" />
+                      {searchingLyrics ? 'AI Searching Lyrics...' : 'Find Lyrics with AI'}
+                    </button>
+
+                    {lyricsError && (
+                      <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '2px' }}>
+                        {lyricsError}
+                      </div>
+                    )}
 
                     <div className="form-group" style={{ margin: 0 }}>
                       <label className="form-label" style={{ fontSize: '0.75rem' }}>Lyrics (Separate slides by a blank line)</label>
@@ -1531,6 +1590,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                         placeholder={"Verse 1 text goes here...\n\nChorus text goes here...\n\nVerse 2 text goes here..."}
                         style={{ resize: 'none', fontFamily: 'inherit', fontSize: '0.8rem' }}
                         required 
+                        disabled={searchingLyrics}
                       />
                     </div>
 
