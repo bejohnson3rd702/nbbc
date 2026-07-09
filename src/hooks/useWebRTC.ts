@@ -673,6 +673,25 @@ export default function useWebRTC(user: User | null) {
         case 'reaction': {
           const id = Date.now() + Math.random();
           setReactions(prev => [...prev, { id, emoji: msg.emoji }]);
+
+          // Play a warm country voice saying "Love and blessings" for the specific reaction
+          if (msg.emoji === '❤️🙏') {
+            try {
+              const utterance = new SpeechSynthesisUtterance("Love and blessings");
+              const voices = window.speechSynthesis.getVoices();
+              const countryVoice = voices.find(v => v.lang === 'en-US' && (v.name.includes('David') || v.name.includes('Microsoft') || v.name.includes('Google US English'))) || voices.find(v => v.lang.startsWith('en'));
+              if (countryVoice) {
+                utterance.voice = countryVoice;
+              }
+              utterance.pitch = 0.85; // Slightly lower pitch for warmth
+              utterance.rate = 0.8;  // Slightly slower cadence for a country drawl
+              utterance.volume = 1.0;
+              window.speechSynthesis.speak(utterance);
+            } catch (e) {
+              console.error('Speech synthesis failed:', e);
+            }
+          }
+
           // Auto remove reaction after 4s
           setTimeout(() => {
             setReactions(prev => prev.filter(r => r.id !== id));

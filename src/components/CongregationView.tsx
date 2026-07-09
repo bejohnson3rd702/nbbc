@@ -89,7 +89,7 @@ interface CongregationViewProps {
 const EMOJI_REACTIONS = [
   { emoji: '🙏', label: 'Amen' },
   { emoji: '🙌', label: 'Hallelujah' },
-  { emoji: '❤️', label: 'Love' },
+  { emoji: '❤️🙏', label: 'Love & Blessings' },
   { emoji: '👏', label: 'Clap' },
   { emoji: '✨', label: 'Praying' }
 ];
