@@ -599,6 +599,11 @@ export default function useWebRTC(user: User | null) {
               }
             } else {
               setIsMutedByPastor(false);
+              // Auto-place in lobby by enabling camera and microphone
+              console.log('Service is pre-live. Auto-placing member into lobby fellowship...');
+              setIsCameraOn(true);
+              setIsMicOn(true);
+              getMedia(true, true);
             }
           }
           break;
