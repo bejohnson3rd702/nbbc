@@ -430,6 +430,21 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
 
   return (
     <div className="dashboard-layout">
+      {/* Hidden audio loop for other members in full mesh connection */}
+      {Object.keys(remoteStreams)
+        .filter(email => email !== pastorObj?.email)
+        .map(email => (
+          <audio 
+            key={email}
+            ref={(el) => {
+              if (el && remoteStreams[email]) {
+                el.srcObject = remoteStreams[email];
+              }
+            }}
+            autoPlay
+          />
+        ))}
+
       {/* Floating reactions wrapper */}
       <div className="reactions-container">
         {allReactions.map((reaction) => {

@@ -861,14 +861,23 @@ export default function useWebRTC(user: User | null) {
     }
   };
 
-  // Connect to Pastor's stream
+  // Full Mesh connection logic: connect to all other online members when service is live
   useEffect(() => {
-    if (user?.role === 'member' && serviceStatus === 'live') {
-      const pastor = members.find(m => m.role === 'pastor');
-      if (pastor && !pcsRef.current[pastor.email]) {
-        initiateCall(pastor.email);
+    if (!user || serviceStatus !== 'live') return;
+
+    members.forEach(member => {
+      // Don't connect to yourself
+      if (member.email === user.email) return;
+
+      // Establish connection if it doesn't exist yet
+      if (!pcsRef.current[member.email]) {
+        // To avoid double-signaling, the peer with the lexicographically smaller email initiates the call
+        if (user.email < member.email) {
+          console.log(`Initiating mesh call to ${member.name} (${member.email})...`);
+          initiateCall(member.email);
+        }
       }
-    }
+    });
   }, [serviceStatus, members, user]);
 
   // Send message

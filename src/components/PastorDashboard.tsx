@@ -74,6 +74,9 @@ interface PastorDashboardProps {
     sendPushAnnouncement: (title: string, text: string) => void;
     spotlightScripture: (text: string, reference?: string) => void;
     sermonTimeline: { timestamp: string; type: 'scripture' | 'point'; text: string }[];
+    approveHandRaise: (memberEmail: string) => void;
+    muteMember: (memberEmail: string) => void;
+    revokeMemberMedia: (memberEmail: string) => void;
   };
 }
 
@@ -300,7 +303,10 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     reactToPrayer,
     sendPushAnnouncement,
     spotlightScripture,
-    sermonTimeline
+    sermonTimeline,
+    approveHandRaise,
+    muteMember,
+    revokeMemberMedia
   } = webrtc;
 
   // Set local video stream
@@ -807,6 +813,34 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                       <span className="participant-name">
                         {member.name}
                       </span>
+
+                      {/* Pastor Moderator Actions */}
+                      <div style={{ display: 'flex', gap: '4px', marginTop: '6px', width: '100%', justifyContent: 'center' }}>
+                        {member.isMuted ? (
+                          <button 
+                            onClick={() => approveHandRaise(member.email)}
+                            className="btn btn-primary"
+                            style={{ padding: '4px 8px', fontSize: '0.65rem', borderRadius: '4px', lineHeight: '1' }}
+                          >
+                            Unmute
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => muteMember(member.email)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.65rem', borderRadius: '4px', lineHeight: '1' }}
+                          >
+                            Mute
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => revokeMemberMedia(member.email)}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '0.65rem', borderRadius: '4px', lineHeight: '1', background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                        >
+                          Revoke
+                        </button>
+                      </div>
 
                       <div className="participant-indicators">
                         {member.isMuted && (
