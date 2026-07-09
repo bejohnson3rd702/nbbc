@@ -471,6 +471,123 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     fetchSongs();
   }, []);
 
+  // Voice Auto-Spotlight states & logic
+  const [voiceAutoSpotlight, setVoiceAutoSpotlight] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const recognitionRef = useRef<any>(null);
+  const lastSpokenRef = useRef<string>('');
+
+  const detectBibleReference = (text: string) => {
+    let cleanText = text
+      .replace(/\bfirst\s+/i, '1 ')
+      .replace(/\bsecond\s+/i, '2 ')
+      .replace(/\bthird\s+/i, '3 ')
+      .replace(/\b1st\s+/i, '1 ')
+      .replace(/\b2nd\s+/i, '2 ')
+      .replace(/\b3rd\s+/i, '3 ');
+
+    for (const book of BIBLE_BOOKS) {
+      const escapedBook = book.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(`\\b(${escapedBook})\\b\\s*(?:chapter\\s*)?(\\d+)\\s*(?::|\\b(?:verse)?\\s*)?(\\d+)?`, 'i');
+      const match = cleanText.match(regex);
+      if (match) {
+        const bookName = match[1];
+        const chapter = match[2];
+        const verse = match[3] || '1';
+        return { bookName, chapter: parseInt(chapter), verse: parseInt(verse) };
+      }
+    }
+    return null;
+  };
+
+  const startVoiceRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech recognition is not supported in this browser. Please use Google Chrome or Safari.');
+      setVoiceAutoSpotlight(false);
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+
+    rec.onresult = async (event: any) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      const activeText = (finalTranscript + ' ' + interimTranscript).trim();
+      setVoiceTranscript(activeText);
+
+      const detected = detectBibleReference(activeText);
+      if (detected) {
+        const refKey = `${detected.bookName} ${detected.chapter}:${detected.verse}`;
+        if (refKey !== lastSpokenRef.current) {
+          lastSpokenRef.current = refKey;
+          console.log('✨ Voice Auto-Spotlight found reference:', refKey);
+          
+          try {
+            const res = await fetch(`https://bible-api.com/${encodeURIComponent(refKey)}`);
+            if (res.ok) {
+              const resData = await res.json();
+              const verseText = resData.text?.trim() || '';
+              if (verseText) {
+                spotlightScripture(verseText, refKey);
+                rec.stop(); // Stop and trigger restart to clear transcript buffer
+              }
+            }
+          } catch (err) {
+            console.error('Failed to auto-fetch spotlit reference text:', err);
+          }
+        }
+      }
+    };
+
+    rec.onend = () => {
+      if (recognitionRef.current === rec) {
+        rec.start();
+      }
+    };
+
+    rec.onerror = (e: any) => {
+      console.warn('Speech recognition error:', e.error);
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
+  const stopVoiceRecognition = () => {
+    if (recognitionRef.current) {
+      const rec = recognitionRef.current;
+      recognitionRef.current = null;
+      rec.stop();
+    }
+    setVoiceTranscript('');
+  };
+
+  useEffect(() => {
+    if (voiceAutoSpotlight) {
+      startVoiceRecognition();
+    } else {
+      stopVoiceRecognition();
+    }
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [voiceAutoSpotlight]);
+
   // Set local video stream
   useEffect(() => {
     if (videoRef.current && localStream) {
@@ -1372,6 +1489,57 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   Spotlight Bible verses or custom text overlays on everyone's live video stream.
                 </p>
+
+                {/* Voice Auto-Spotlight Controller */}
+                <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.15)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontSize: '0.8rem', color: 'white', fontWeight: 600, display: 'block' }}>🎤 Voice Auto-Spotlight (AI)</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Auto-spotlight scriptures by preaching them!</span>
+                    </div>
+                    <label className="switch" style={{ position: 'relative', display: 'inline-block', width: '34px', height: '20px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={voiceAutoSpotlight}
+                        onChange={(e) => setVoiceAutoSpotlight(e.target.checked)}
+                        style={{ opacity: 0, width: 0, height: 0 }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        cursor: 'pointer',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: voiceAutoSpotlight ? 'var(--primary-gold)' : '#334155',
+                        borderRadius: '20px',
+                        transition: '0.4s'
+                      }}>
+                        <span style={{
+                          position: 'absolute',
+                          content: '""',
+                          height: '14px', width: '14px',
+                          left: voiceAutoSpotlight ? '16px' : '3px',
+                          bottom: '3px',
+                          backgroundColor: 'white',
+                          borderRadius: '50%',
+                          transition: '0.4s'
+                        }} />
+                      </span>
+                    </label>
+                  </div>
+
+                  {voiceAutoSpotlight && (
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--primary-gold)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.5s infinite' }} />
+                        Listening for scripture references...
+                      </span>
+                      {voiceTranscript && (
+                        <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: '1.3' }}>
+                          "{voiceTranscript}"
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Current Active Spotlight */}
                 <div className="glass-panel" style={{ padding: '12px', border: '1px solid rgba(226,168,80,0.2)' }}>
