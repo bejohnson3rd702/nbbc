@@ -774,4 +774,39 @@ body {
   }
 }
 
+/* Live Broadcast Animations and Styles */
+.video-stage.live {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.3) !important;
+  animation: liveBroadcastPulse 2s infinite alternate;
+}
+
+.video-stage.live-sanctuary {
+  border: 2.5px solid var(--primary-gold) !important;
+  box-shadow: 0 0 35px rgba(226, 168, 80, 0.25) !important;
+  animation: liveSanctuaryPulse 2s infinite alternate;
+}
+
+@keyframes liveBroadcastPulse {
+  0% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 35px rgba(239, 68, 68, 0.5);
+    border-color: #ef4444;
+  }
+}
+
+@keyframes liveSanctuaryPulse {
+  0% {
+    box-shadow: 0 0 20px rgba(226, 168, 80, 0.15);
+    border-color: rgba(226, 168, 80, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 45px rgba(226, 168, 80, 0.4);
+    border-color: var(--primary-gold);
+  }
+}
+
 

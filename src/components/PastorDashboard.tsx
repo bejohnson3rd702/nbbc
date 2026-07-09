@@ -668,7 +668,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
         </div>
 
         {/* Video Stage */}
-        <div className="video-stage">
+        <div className={`video-stage ${serviceStatus === 'live' ? 'live' : ''}`}>
           {serviceStatus === 'live' && isCameraOn ? (
             <video 
               ref={videoRef} 

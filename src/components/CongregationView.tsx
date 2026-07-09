@@ -608,7 +608,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
         </div>
 
         {/* Pastor's Broadcast Screen (Theater View) */}
-        <div className="video-stage">
+        <div className={`video-stage ${serviceStatus === 'live' ? 'live-sanctuary' : ''}`}>
           {isLive ? (
             hasPastorStream && serviceStatus === 'live' ? (
               <ParticipantVideo 
