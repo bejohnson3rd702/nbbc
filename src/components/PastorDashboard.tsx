@@ -320,6 +320,26 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     updateRole
   } = webrtc;
 
+  const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
+
+  // Fetch all registered users from database
+  useEffect(() => {
+    const fetchRegisteredUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name, email, role, bio, avatar_url');
+        if (error) throw error;
+        if (data) {
+          setRegisteredUsers(data);
+        }
+      } catch (err) {
+        console.error('Error fetching registered users:', err);
+      }
+    };
+    fetchRegisteredUsers();
+  }, [members]);
+
   // Set local video stream
   useEffect(() => {
     if (videoRef.current && localStream) {
@@ -1453,17 +1473,20 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
-                Online & Registered Members ({members.length})
+                All Registered Members ({registeredUsers.length})
               </span>
               
-              {members.length === 0 ? (
+              {registeredUsers.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px', fontSize: '0.8rem' }}>
-                  No members are currently online.
+                  No members are registered in the system database.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {members.map((member: any) => {
+                  {registeredUsers.map((member: any) => {
                     const isPastorSelf = member.email === user.email;
+                    const onlineMember = members.find(m => m.email === member.email);
+                    const isOnline = !!onlineMember;
+
                     return (
                       <div key={member.email} className="glass-panel" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1487,9 +1510,21 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                             )}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {member.name} {isPastorSelf && '(You)'}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {member.name} {isPastorSelf && '(You)'}
+                              </span>
+                              <span style={{ 
+                                fontSize: '0.6rem', 
+                                padding: '1px 4px', 
+                                borderRadius: '3px', 
+                                background: isOnline ? 'rgba(74, 222, 128, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                                color: isOnline ? '#4ade80' : 'var(--text-muted)',
+                                border: isOnline ? '1px solid rgba(74, 222, 128, 0.25)' : '1px solid rgba(255,255,255,0.05)'
+                              }}>
+                                {isOnline ? 'Online' : 'Offline'}
+                              </span>
+                            </div>
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {member.email}
                             </span>
@@ -1514,7 +1549,10 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                                 const newRole = e.target.value as any;
                                 try {
                                   await supabase.from('users').update({ role: newRole }).eq('email', member.email);
-                                  updateRole(member.email, newRole);
+                                  if (isOnline) {
+                                    updateRole(member.email, newRole);
+                                  }
+                                  setRegisteredUsers(prev => prev.map(u => u.email === member.email ? { ...u, role: newRole } : u));
                                 } catch (err) {
                                   console.error('Failed to change member role:', err);
                                 }
@@ -1538,7 +1576,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                           )}
                         </div>
 
-                        {!isPastorSelf && (
+                        {!isPastorSelf && isOnline && onlineMember && (
                           <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                             <button 
                               type="button"
@@ -1546,7 +1584,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                               className="btn btn-secondary"
                               style={{ flex: 1, padding: '4px', fontSize: '0.65rem' }}
                             >
-                              {member.isMuted ? 'Unmute Mic' : 'Mute Mic'}
+                              {onlineMember.isMuted ? 'Unmute Mic' : 'Mute Mic'}
                             </button>
                             <button 
                               type="button"
