@@ -515,20 +515,32 @@ export default function useWebRTC(user: User | null) {
           }
         });
 
-        // Manually trigger negotiation if stable to guarantee renegotiation
-        if (pc.signalingState === 'stable') {
-          try {
-            console.log(`Manually triggering renegotiation for ${email}...`);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socketRef.current?.send(JSON.stringify({
+        // Safely trigger renegotiation based on lexicographical email roles to prevent signaling races
+        if (user && user.email < email) {
+          if (pc.signalingState === 'stable') {
+            try {
+              console.log(`Manually triggering renegotiation for ${email}...`);
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              socketRef.current?.send(JSON.stringify({
+                type: 'signal',
+                target: email,
+                sender: user.email,
+                signalData: { sdp: pc.localDescription }
+              }));
+            } catch (e) {
+              console.error('Error during manual renegotiation:', e);
+            }
+          }
+        } else if (user) {
+          if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            console.log(`Requesting caller ${email} to renegotiate...`);
+            socketRef.current.send(JSON.stringify({
               type: 'signal',
               target: email,
-              sender: user?.email,
-              signalData: { sdp: pc.localDescription }
+              sender: user.email,
+              signalData: { renegotiate: true }
             }));
-          } catch (e) {
-            console.error('Error during manual renegotiation:', e);
           }
         }
       });
@@ -727,7 +739,23 @@ export default function useWebRTC(user: User | null) {
             pc = createPeerConnection(sender);
           }
 
-          if (signalData.sdp) {
+          if (signalData.renegotiate) {
+            try {
+              if (pc.signalingState === 'stable') {
+                console.log(`Received renegotiation request from ${sender}. Creating offer...`);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                ws.send(JSON.stringify({
+                  type: 'signal',
+                  target: sender,
+                  sender: user.email,
+                  signalData: { sdp: pc.localDescription }
+                }));
+              }
+            } catch (err) {
+              console.error('Error handling renegotiate request signal:', err);
+            }
+          } else if (signalData.sdp) {
             await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
             if (signalData.sdp.type === 'offer') {
               // Add local stream tracks to transceivers if available
@@ -813,18 +841,30 @@ export default function useWebRTC(user: User | null) {
 
     pc.onnegotiationneeded = async () => {
       try {
-        if (pc.signalingState === 'stable') {
-          console.log(`Negotiation needed with ${remoteEmail}. Creating offer...`);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          
-          if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({
-              type: 'signal',
-              target: remoteEmail,
-              sender: user?.email,
-              signalData: { sdp: pc.localDescription }
-            }));
+        if (user && pc.signalingState === 'stable') {
+          if (user.email < remoteEmail) {
+            console.log(`Negotiation needed with ${remoteEmail}. Creating offer...`);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+              socketRef.current.send(JSON.stringify({
+                type: 'signal',
+                target: remoteEmail,
+                sender: user.email,
+                signalData: { sdp: pc.localDescription }
+              }));
+            }
+          } else {
+            console.log(`Negotiation needed with ${remoteEmail} (we are receiver). Requesting renegotiation...`);
+            if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+              socketRef.current.send(JSON.stringify({
+                type: 'signal',
+                target: remoteEmail,
+                sender: user.email,
+                signalData: { renegotiate: true }
+              }));
+            }
           }
         }
       } catch (err) {
