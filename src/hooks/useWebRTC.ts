@@ -822,7 +822,7 @@ export default function useWebRTC(user: User | null) {
   useEffect(() => {
     if (user?.role === 'member' && serviceStatus === 'live') {
       const pastor = members.find(m => m.role === 'pastor');
-      if (pastor) {
+      if (pastor && !pcsRef.current[pastor.email]) {
         initiateCall(pastor.email);
       }
     }
