@@ -38,7 +38,7 @@ export default function useWebRTC(user: User | null) {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
-  const [isMutedByPastor, setIsMutedByPastor] = useState(true);
+  const [isMutedByPastor, setIsMutedByPastor] = useState(false);
   
 
 
@@ -588,6 +588,19 @@ export default function useWebRTC(user: User | null) {
       switch (msg.type) {
         case 'service-state': {
           setServiceStatus(msg.status);
+          if (user && user.role === 'member') {
+            if (msg.status === 'live') {
+              setIsMicOn(false);
+              setIsMutedByPastor(true);
+              // Stop local audio track if active to prevent background noise at start
+              if (localStreamRef.current) {
+                localStreamRef.current.getAudioTracks().forEach(t => t.stop());
+                getMedia(isCameraOn, false);
+              }
+            } else {
+              setIsMutedByPastor(false);
+            }
+          }
           break;
         }
 
@@ -998,6 +1011,10 @@ export default function useWebRTC(user: User | null) {
 
   // Toggle Microphone
   const toggleMic = async () => {
+    if (user && user.role === 'member' && serviceStatus === 'live' && isMutedByPastor) {
+      console.warn('Cannot unmute: muted by pastor during live service.');
+      return;
+    }
     const nextState = !isMicOn;
     setIsMicOn(nextState);
     await getMedia(isCameraOn, nextState);
