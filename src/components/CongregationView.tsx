@@ -31,6 +31,29 @@ const SIMULATED_MEMBERS = [
   { email: 'mary@nbbc.org', name: 'Sister Mary', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false }
 ];
 
+interface ParticipantVideoProps {
+  stream: MediaStream;
+}
+
+function ParticipantVideo({ stream }: ParticipantVideoProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <video 
+      ref={videoRef}
+      autoPlay 
+      playsInline 
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    />
+  );
+}
+
 interface CongregationViewProps {
   user: { name: string; email: string; role: 'pastor' | 'member' };
   onLogout: () => void;
@@ -527,65 +550,91 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
               </div>
             )
           ) : (
-            isCameraOn && localStream ? (
-              <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at center, #1b2640 0%, #080c16 100%)', padding: '24px' }}>
-                <div className="glass-panel" style={{ 
-                  width: '300px', 
-                  aspectRatio: '4/3', 
-                  overflow: 'hidden', 
-                  borderRadius: '16px', 
-                  border: '2px solid var(--primary-gold)', 
-                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(226, 168, 80, 0.1)',
-                  position: 'relative',
-                  marginBottom: '16px'
-                }}>
-                  <video 
-                    ref={(el) => {
-                      if (el && localStream) {
-                        el.srcObject = localStream;
-                      }
-                    }}
-                    autoPlay 
-                    playsInline 
-                    muted 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-                  />
-                </div>
-                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <img 
-                    src="/nbbc-logo.jpg" 
-                    alt="NBBC Logo" 
-                    className="logo-spin"
-                    style={{ width: '60px', height: '60px', borderRadius: '50%', border: '1px solid var(--primary-gold)', boxShadow: '0 0 10px rgba(226,168,80,0.15)', objectFit: 'cover' }}
-                  />
-                  <div>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.4rem', marginBottom: '4px' }}>
-                      Sanctuary Lobby
-                    </h3>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto' }}>
-                      You are in the lobby. Sunday Service will begin shortly. Your camera is active for the sanctuary grid.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                <img 
-                  src="/nbbc-logo.jpg" 
-                  alt="NBBC Logo" 
-                  className="logo-spin"
-                  style={{ width: '180px', height: '180px', borderRadius: '50%', border: '2px solid var(--primary-gold)', boxShadow: '0 0 25px rgba(226,168,80,0.25)', objectFit: 'cover' }}
-                />
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '24px', gap: '16px', background: 'radial-gradient(circle at center, #1b2640 0%, #080c16 100%)', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
                 <div>
-                  <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.8rem', marginBottom: '8px' }}>
-                    Sanctuary Doors Closed
+                  <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.4rem' }}>
+                    ⛪ Sanctuary Fellowship Lobby
                   </h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: '400px', margin: '0 auto' }}>
-                    Sunday Service is not currently broadcasting. Please wait for the Pastor to go live, or click "Simulate Live Service" above to test.
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>
+                    Welcome! Chat, turn on your camera, and connect with other members before Sunday Service begins.
                   </p>
                 </div>
+                <div style={{ background: 'rgba(226,168,80,0.1)', color: 'var(--primary-gold)', border: '1px solid var(--primary-gold)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600 }}>
+                  Sanctuary Lobby Active
+                </div>
               </div>
-            )
+
+              {/* Lobby Video Feeds Grid */}
+              <div className="participant-grid" style={{ flex: 1, minHeight: '200px' }}>
+                {/* Local Member Card */}
+                <div className={`participant-card ${isCameraOn ? 'streaming' : ''}`}>
+                  {isCameraOn && localStream ? (
+                    <video 
+                      ref={(el) => {
+                        if (el && localStream) {
+                          el.srcObject = localStream;
+                        }
+                      }}
+                      autoPlay 
+                      playsInline 
+                      muted 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                    />
+                  ) : (
+                    <div className="participant-avatar-container">
+                      <div className="participant-avatar">
+                        {user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+                  <span className="participant-name">{user.name} (You)</span>
+                  <div className="participant-indicators">
+                    {!isMicOn && (
+                      <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%' }}>
+                        <MicOff size={10} color="white" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Other Online Members */}
+                {allMembers
+                  .filter(m => m.email !== user.email && m.role === 'member')
+                  .map((member) => {
+                    const hasVideo = member.isStreaming && remoteStreams[member.email];
+                    const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+                    return (
+                      <div 
+                        key={member.email} 
+                        className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
+                      >
+                        {hasVideo ? (
+                          <ParticipantVideo stream={remoteStreams[member.email]} />
+                        ) : (
+                          <div className="participant-avatar-container">
+                            <div className="participant-avatar">{initials}</div>
+                            {member.isStreaming && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                Connecting camera...
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <span className="participant-name">{member.name}</span>
+                        <div className="participant-indicators">
+                          {member.isMuted && (
+                            <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%' }}>
+                              <MicOff size={10} color="white" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           )}
 
           {isLive && (
@@ -641,6 +690,64 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             </div>
           )}
         </div>
+
+        {/* Congregation Camera Feeds (visible during live service) */}
+        {isLive && (
+          <div className="glass-panel" style={{ padding: '20px', marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <Users size={20} />
+              Congregation Camera Feeds ({allMembers.filter(m => m.role === 'member').length})
+            </h3>
+            
+            {allMembers.filter(m => m.role === 'member').length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px 0', textAlign: 'center' }}>
+                No congregation members have joined the sanctuary yet.
+              </div>
+            ) : (
+              <div className="participant-grid">
+                {allMembers
+                  .filter(m => m.role === 'member')
+                  .map((member) => {
+                    const hasVideo = member.isStreaming && remoteStreams[member.email];
+                    const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+                    return (
+                      <div 
+                        key={member.email} 
+                        className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
+                      >
+                        {hasVideo ? (
+                          <ParticipantVideo stream={remoteStreams[member.email]} />
+                        ) : (
+                          <div className="participant-avatar-container">
+                            <div className="participant-avatar">{initials}</div>
+                            {member.isStreaming && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                Connecting camera...
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <span className="participant-name">{member.name}</span>
+                        <div className="participant-indicators">
+                          {member.isMuted && (
+                            <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%' }}>
+                              <MicOff size={10} color="white" />
+                            </div>
+                          )}
+                          {member.handRaised && (
+                            <div style={{ background: 'var(--text-gold)', padding: '4px', borderRadius: '50%' }}>
+                              <Hand size={10} color="black" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Interactive Emojis panel */}
         {isLive && (

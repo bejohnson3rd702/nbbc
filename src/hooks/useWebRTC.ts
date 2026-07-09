@@ -576,23 +576,6 @@ export default function useWebRTC(user: User | null) {
       switch (msg.type) {
         case 'service-state': {
           setServiceStatus(msg.status);
-          if (msg.status === 'offline') {
-            // Clean up peer connections
-            Object.keys(pcsRef.current).forEach(email => {
-              pcsRef.current[email].close();
-            });
-            pcsRef.current = {};
-            setRemoteStreams({});
-            
-            // Turn off camera/mic for congregation on service stop
-            if (user.role === 'member') {
-              setIsCameraOn(false);
-              setIsMicOn(false);
-              setHandRaised(false);
-              setIsMutedByPastor(true);
-              stopLocalStream();
-            }
-          }
           break;
         }
 
@@ -664,8 +647,8 @@ export default function useWebRTC(user: User | null) {
         case 'members-list': {
           setMembers(msg.members);
           
-          // If pastor, check if any member disconnected and clean up WebRTC
-          if (user.role === 'pastor') {
+          // Check if any member disconnected and clean up WebRTC
+          if (user) {
             const activeEmails = msg.members.map((m: any) => m.email);
             Object.keys(pcsRef.current).forEach(email => {
               if (!activeEmails.includes(email)) {
@@ -861,9 +844,9 @@ export default function useWebRTC(user: User | null) {
     }
   };
 
-  // Full Mesh connection logic: connect to all other online members when service is live
+  // Full Mesh connection logic: connect to all other online members
   useEffect(() => {
-    if (!user || serviceStatus !== 'live') return;
+    if (!user) return;
 
     members.forEach(member => {
       // Don't connect to yourself
@@ -878,7 +861,7 @@ export default function useWebRTC(user: User | null) {
         }
       }
     });
-  }, [serviceStatus, members, user]);
+  }, [members, user]);
 
   // Send message
   const sendChatMessage = (text: string) => {

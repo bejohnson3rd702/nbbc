@@ -441,14 +441,6 @@ wss.on('connection', (ws) => {
       console.log(`${client.name} disconnected`);
       clients.delete(ws);
 
-      if (client.role === 'pastor') {
-        serviceActive = false;
-        broadcast({
-          type: 'service-state',
-          status: 'offline'
-        });
-      }
-
       broadcast({
         type: 'members-list',
         members: getActiveMembers()
