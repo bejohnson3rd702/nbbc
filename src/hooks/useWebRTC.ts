@@ -484,7 +484,7 @@ export default function useWebRTC(user: User | null) {
       updateMediaStateOnServer(video, !audio);
 
       // Update active WebRTC connections with new tracks using replaceTrack/transceivers
-      Object.keys(pcsRef.current).forEach(email => {
+      Object.keys(pcsRef.current).forEach(async email => {
         const pc = pcsRef.current[email];
         const senders = pc.getSenders();
 
@@ -514,6 +514,23 @@ export default function useWebRTC(user: User | null) {
             t.direction = 'recvonly';
           }
         });
+
+        // Manually trigger negotiation if stable to guarantee renegotiation
+        if (pc.signalingState === 'stable') {
+          try {
+            console.log(`Manually triggering renegotiation for ${email}...`);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socketRef.current?.send(JSON.stringify({
+              type: 'signal',
+              target: email,
+              sender: user?.email,
+              signalData: { sdp: pc.localDescription }
+            }));
+          } catch (e) {
+            console.error('Error during manual renegotiation:', e);
+          }
+        }
       });
 
       return finalStream;
