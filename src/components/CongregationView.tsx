@@ -697,7 +697,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                         className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
                       >
                         {hasVideo ? (
-                          <ParticipantVideo stream={remoteStreams[member.email]} />
+                          <ParticipantVideo stream={remoteStreams[member.email]} muted={true} />
                         ) : (
                           <div className="participant-avatar-container">
                             <div className="participant-avatar">{initials}</div>
@@ -863,7 +863,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                         style={{ flex: '0 0 150px', aspectRatio: '4/3', margin: 0 }}
                       >
                         {hasVideo ? (
-                          <ParticipantVideo stream={remoteStreams[member.email]} />
+                          <ParticipantVideo stream={remoteStreams[member.email]} muted={true} />
                         ) : (
                           <div className="participant-avatar-container">
                             <div className="participant-avatar" style={{ width: '40px', height: '40px', fontSize: '1rem' }}>{initials}</div>

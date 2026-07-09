@@ -18,9 +18,11 @@ interface MemberStatus {
 
 interface ParticipantVideoProps {
   stream: MediaStream;
+  muted?: boolean;
+  style?: React.CSSProperties;
 }
 
-function ParticipantVideo({ stream }: ParticipantVideoProps) {
+function ParticipantVideo({ stream, muted, style }: ParticipantVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -34,7 +36,8 @@ function ParticipantVideo({ stream }: ParticipantVideoProps) {
       ref={videoRef}
       autoPlay 
       playsInline 
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      muted={muted}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', ...style }}
     />
   );
 }
@@ -571,6 +574,18 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
 
   return (
     <div className="dashboard-layout">
+      {/* Hidden audio loop for remote member streams in full mesh connection */}
+      {Object.keys(remoteStreams).map(email => (
+        <audio 
+          key={email}
+          ref={(el) => {
+            if (el && remoteStreams[email]) {
+              el.srcObject = remoteStreams[email];
+            }
+          }}
+          autoPlay
+        />
+      ))}
       {/* Real-time Giving Toast Notification */}
       {givingToast && (
         <div style={{
@@ -798,7 +813,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                       className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
                     >
                       {hasVideo ? (
-                        <ParticipantVideo stream={remoteStreams[member.email]} />
+                        <ParticipantVideo stream={remoteStreams[member.email]} muted={true} />
                       ) : (
                         <div className="participant-avatar-container">
                           <div className="participant-avatar">{initials}</div>
