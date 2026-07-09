@@ -435,6 +435,26 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     };
   }, [isLive]);
 
+  // User interaction listener to resume background music if blocked by browser autoplay rules
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (ytPlayerRef.current && !isLive) {
+        try {
+          if (ytPlayerRef.current.getPlayerState() !== 1) { // 1 = playing
+            ytPlayerRef.current.playVideo();
+          }
+        } catch (e) {}
+      }
+    };
+    
+    window.addEventListener('click', handleUserInteraction);
+    window.addEventListener('touchstart', handleUserInteraction);
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [isLive]);
+
   const allMembers = demoServiceActive
     ? [...members, ...SIMULATED_MEMBERS.filter(sm => !members.some(m => m.email === sm.email))]
     : members;
@@ -547,8 +567,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           />
         ))}
 
-      {/* Hidden YouTube player for background music in the lobby */}
-      <div id="youtube-lobby-player" style={{ display: 'none' }}></div>
+      {/* Hidden YouTube player for background music in the lobby (placed off-screen to allow browser rendering/playback) */}
+      <div id="youtube-lobby-player" style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}></div>
 
       {/* Floating reactions wrapper */}
       <div className="reactions-container">
