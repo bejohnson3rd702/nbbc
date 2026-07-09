@@ -95,6 +95,7 @@ export default function useWebRTC(user: User | null) {
   // Prayer Wall & Scripture Spotlight States
   const [prayers, setPrayers] = useState<any[]>([]);
   const [activeSpotlight, setActiveSpotlight] = useState<{ text: string; reference?: string } | null>(null);
+  const [sermonTimeline, setSermonTimeline] = useState<{ timestamp: string; type: 'scripture' | 'point'; text: string }[]>([]);
 
   const fetchPrayers = async () => {
     const url = import.meta.env.VITE_SUPABASE_URL;
@@ -617,6 +618,20 @@ export default function useWebRTC(user: User | null) {
 
         case 'scripture-spotlight': {
           setActiveSpotlight(msg.scripture);
+          if (msg.scripture) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setSermonTimeline(prev => [
+              ...prev,
+              {
+                timestamp: timeStr,
+                type: msg.scripture.reference ? 'scripture' : 'point',
+                text: msg.scripture.reference 
+                  ? `${msg.scripture.reference}: ${msg.scripture.text}` 
+                  : msg.scripture.text
+              }
+            ]);
+          }
           break;
         }
 
@@ -899,6 +914,7 @@ export default function useWebRTC(user: User | null) {
     if (user?.role !== 'pastor') return;
 
     if (start) {
+      setSermonTimeline([]);
       // Turn on pastor camera/mic
       setIsCameraOn(true);
       setIsMicOn(true);
@@ -966,6 +982,8 @@ export default function useWebRTC(user: User | null) {
     postPrayer,
     reactToPrayer,
     sendPushAnnouncement,
-    spotlightScripture
+    spotlightScripture,
+    sermonTimeline,
+    setSermonTimeline
   };
 }

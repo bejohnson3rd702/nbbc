@@ -50,6 +50,7 @@ interface PastorDashboardProps {
     reactToPrayer: (id: any) => void;
     sendPushAnnouncement: (title: string, text: string) => void;
     spotlightScripture: (text: string, reference?: string) => void;
+    sermonTimeline: { timestamp: string; type: 'scripture' | 'point'; text: string }[];
   };
 }
 
@@ -275,7 +276,8 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     postPrayer,
     reactToPrayer,
     sendPushAnnouncement,
-    spotlightScripture
+    spotlightScripture,
+    sermonTimeline
   } = webrtc;
 
   // Set local video stream
@@ -382,11 +384,28 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
 
         const videoUrl = urlData.publicUrl;
 
-        // 3. Save DB Record
+        // Generate AI Notes from timeline
+        let generatedNotes = '';
+        try {
+          const notesRes = await fetch(`${API_BASE}/api/generate-notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: sermonTitle.trim(), timeline: sermonTimeline })
+          });
+          if (notesRes.ok) {
+            const notesData = await notesRes.json();
+            generatedNotes = notesData.notes;
+          }
+        } catch (notesErr) {
+          console.error('Error generating AI notes during upload:', notesErr);
+        }
+
+        // 3. Save DB Record (including AI notes)
         const { error: dbError } = await supabase.from('sermons').insert({
           title: sermonTitle.trim(),
           date: new Date().toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }),
-          video_url: videoUrl
+          video_url: videoUrl,
+          ai_notes: generatedNotes
         });
 
         if (dbError) throw dbError;
@@ -1330,6 +1349,20 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             {uploadSuccess && (
               <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', color: '#34d399', padding: '10px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '15px', textAlign: 'center' }}>
                 Sermon successfully saved and archived!
+              </div>
+            )}
+
+            {sermonTimeline.length > 0 && (
+              <div style={{ marginBottom: '15px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', maxHeight: '120px', overflowY: 'auto', textAlign: 'left' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  RECORDED SERMON TIMELINE (FOR AI NOTES):
+                </span>
+                {sermonTimeline.map((item, idx) => (
+                  <div key={idx} style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', gap: '6px', marginBottom: '2px' }}>
+                    <span style={{ color: 'var(--primary-gold)' }}>[{item.timestamp}]</span>
+                    <span>{item.text}</span>
+                  </div>
+                ))}
               </div>
             )}
 

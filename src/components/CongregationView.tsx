@@ -198,8 +198,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   };
 
   // Archive States
-  const [archiveSermons, setArchiveSermons] = useState<{ id: number; title: string; date: string; videoUrl: string }[]>([]);
-  const [selectedSermon, setSelectedSermon] = useState<{ id: number; title: string; date: string; videoUrl: string } | null>(null);
+  const [archiveSermons, setArchiveSermons] = useState<{ id: number; title: string; date: string; videoUrl: string; aiNotes?: string }[]>([]);
+  const [selectedSermon, setSelectedSermon] = useState<{ id: number; title: string; date: string; videoUrl: string; aiNotes?: string } | null>(null);
   const [loadingArchive, setLoadingArchive] = useState(false);
 
   // Bible States
@@ -229,7 +229,8 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           id: s.id,
           title: s.title,
           date: s.date,
-          videoUrl: s.video_url
+          videoUrl: s.video_url,
+          aiNotes: s.ai_notes
         }));
         setArchiveSermons(formattedSermons);
       } catch (e) {
@@ -1204,7 +1205,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
           zIndex: 9999,
           padding: '20px'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: selectedSermon.aiNotes ? '1100px' : '800px', display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px', transition: 'max-width 0.3s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.4rem' }}>
@@ -1223,13 +1224,75 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
               </button>
             </div>
             
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '8px', overflow: 'hidden' }}>
-              <video 
-                src={selectedSermon.videoUrl.startsWith('http') ? selectedSermon.videoUrl : `${API_BASE}${selectedSermon.videoUrl}`} 
-                controls 
-                autoPlay 
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: selectedSermon.aiNotes ? 'row' : 'column', 
+              gap: '20px',
+              alignItems: 'stretch',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ 
+                position: 'relative', 
+                flex: 2,
+                minWidth: '320px',
+                aspectRatio: '16/9', 
+                background: '#000', 
+                borderRadius: '8px', 
+                overflow: 'hidden' 
+              }}>
+                <video 
+                  src={selectedSermon.videoUrl.startsWith('http') ? selectedSermon.videoUrl : `${API_BASE}${selectedSermon.videoUrl}`} 
+                  controls 
+                  autoPlay 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
+              </div>
+
+              {selectedSermon.aiNotes && (
+                <div style={{ 
+                  flex: 1.2, 
+                  minWidth: '280px',
+                  maxHeight: '450px',
+                  overflowY: 'auto',
+                  background: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  textAlign: 'left'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', borderBottom: '1px solid rgba(226,168,80,0.2)', paddingBottom: '6px' }}>
+                    <Sparkles size={16} color="var(--primary-gold)" />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--primary-gold)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      AI Sermon Study Guide
+                    </span>
+                  </div>
+                  <div 
+                    className="markdown-body" 
+                    style={{ 
+                      fontSize: '0.85rem', 
+                      lineHeight: '1.6', 
+                      color: '#f1f5f9',
+                      fontFamily: 'var(--font-serif)'
+                    }}
+                  >
+                    {selectedSermon.aiNotes.split('\n').map((line, idx) => {
+                      if (line.startsWith('# ')) {
+                        return <h3 key={idx} style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', fontSize: '1.2rem', marginTop: '12px', marginBottom: '8px' }}>{line.replace('# ', '')}</h3>;
+                      }
+                      if (line.startsWith('## ')) {
+                        return <h4 key={idx} style={{ color: 'var(--text-gold)', fontFamily: 'var(--font-serif)', fontSize: '1rem', marginTop: '14px', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>{line.replace('## ', '')}</h4>;
+                      }
+                      if (line.startsWith('- ')) {
+                        return <li key={idx} style={{ marginLeft: '12px', marginBottom: '4px' }}>{line.replace('- ', '')}</li>;
+                      }
+                      if (line.startsWith('1. ') || line.startsWith('2. ') || line.startsWith('3. ')) {
+                        return <p key={idx} style={{ margin: '4px 0 4px 12px', fontStyle: 'italic', color: 'var(--text-muted)' }}>{line}</p>;
+                      }
+                      return <p key={idx} style={{ margin: '6px 0' }}>{line}</p>;
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -57,6 +57,97 @@ app.post('/api/prayers/:id/react', (req, res) => {
   res.json(prayer);
 });
 
+app.post('/api/generate-notes', async (req, res) => {
+  const { title, timeline } = req.body;
+  if (!title) {
+    return res.status(400).json({ error: 'Sermon title is required' });
+  }
+
+  const timelineList = timeline || [];
+  const key = process.env.GEMINI_API_KEY;
+
+  if (key) {
+    try {
+      console.log('Generating sermon notes using Gemini API...');
+      const prompt = `You are an AI theology assistant. Generate a highly polished, structured, and inspiring sermon study guide notes for a sermon titled "${title}". 
+Here is the chronological timeline of what the pastor spotlighted during the service:
+${timelineList.map(item => `[${item.timestamp}] (${item.type}) ${item.text}`).join('\n')}
+
+Please format the response in clean Markdown (without wrapping it in markdown code block ticks like \`\`\`markdown) using the following outline:
+# ${title}
+## Sermon Overview
+(Provide a 2-3 sentence summary of the core message)
+
+## Key Scripture References
+(List all scriptures mentioned in the timeline, with brief summaries of their context in the sermon)
+
+## Core Sermon Points & Takeaways
+(Detail the main points of the sermon based on the timeline, adding constructive theological and practical context for the congregation)
+
+## Practical Application & Reflection
+(Provide 3 thought-provoking questions or action steps for personal or small group reflection)`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      let aiNotes = responseData?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (aiNotes) {
+        aiNotes = aiNotes.replace(/^```markdown\n/, '').replace(/```$/, '');
+        return res.json({ notes: aiNotes });
+      }
+    } catch (e) {
+      console.error('Error generating notes with Gemini API:', e);
+    }
+  }
+
+  // Fallback heuristic generator
+  console.log('Generating sermon notes using fallback template...');
+  const scriptures = timelineList.filter(t => t.type === 'scripture');
+  const points = timelineList.filter(t => t.type === 'point');
+
+  let markdown = `# ${title}\n\n`;
+  markdown += `## Sermon Overview\n`;
+  markdown += `This service centered around the theme of *"${title}"*. We explored how the scriptures guide us to live out our faith daily, remain steadfast, and build a strong spiritual foundation in our lives.\n\n`;
+
+  markdown += `## Key Scripture References\n`;
+  if (scriptures.length > 0) {
+    scriptures.forEach(s => {
+      markdown += `- **${s.text}** (Shared at ${s.timestamp})\n`;
+    });
+  } else {
+    markdown += `*No specific scriptures were spotlit during this service. We encourage you to study the Bible daily and apply its wisdom to your life.*\n`;
+  }
+  markdown += `\n`;
+
+  markdown += `## Core Sermon Points & Takeaways\n`;
+  if (points.length > 0) {
+    points.forEach(p => {
+      markdown += `- **${p.text}** (Shared at ${p.timestamp})\n`;
+    });
+  } else {
+    markdown += `- **Stay Anchored in Faith**: Keep your trust in God's promises during all seasons.\n`;
+    markdown += `- **Community Fellowship**: Walk together in unity and lift one another up in prayer.\n`;
+  }
+  markdown += `\n`;
+
+  markdown += `## Practical Application & Reflection\n`;
+  markdown += `1. **Reflect**: How does today's word, *"${title}"*, challenge your current walk of faith?\n`;
+  markdown += `2. **Pray**: Spend time this week asking for guidance to apply this scripture in your daily choices.\n`;
+  markdown += `3. **Share**: Discuss these key takeaways with a friend, family member, or small group this week.\n`;
+
+  res.json({ notes: markdown });
+});
+
 // Serve static files from the React build folder (dist) if it exists
 const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
