@@ -5,13 +5,13 @@ import { API_BASE, WS_URL } from '../lib/apiConfig';
 interface User {
   name: string;
   email: string;
-  role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor';
+  role: 'pastor' | 'member';
 }
 
 interface MemberStatus {
   email: string;
   name: string;
-  role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor';
+  role: 'pastor' | 'member';
   isStreaming: boolean;
   isMuted: boolean;
   handRaised: boolean;
@@ -951,15 +951,6 @@ export default function useWebRTC(user: User | null) {
     }
   };
 
-  const changeSeat = (newRole: 'deacon' | 'choir' | 'member' | 'visitor') => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({
-        type: 'change-seat',
-        role: newRole
-      }));
-    }
-  };
-
   return {
     members,
     chatMessages,
@@ -993,7 +984,6 @@ export default function useWebRTC(user: User | null) {
     sendPushAnnouncement,
     spotlightScripture,
     sermonTimeline,
-    setSermonTimeline,
-    changeSeat
+    setSermonTimeline
   };
 }

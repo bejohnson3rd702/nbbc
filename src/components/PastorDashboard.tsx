@@ -10,7 +10,7 @@ import { BIBLE_BOOKS } from '../data/bibleMetadata';
 interface MemberStatus {
   email: string;
   name: string;
-  role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor';
+  role: 'pastor' | 'member';
   isStreaming: boolean;
   isMuted: boolean;
   handRaised: boolean;
@@ -25,7 +25,7 @@ interface ChatMessage {
 }
 
 interface PastorDashboardProps {
-  user: { name: string; email: string; role: 'pastor' | 'deacon' | 'choir' | 'member' | 'visitor' };
+  user: { name: string; email: string; role: 'pastor' | 'member' };
   onLogout: () => void;
   webrtc: {
     members: MemberStatus[];
@@ -54,14 +54,12 @@ interface PastorDashboardProps {
   };
 }
 
+// Simulated data generator for high-fidelity testing
 const SIMULATED_MEMBERS = [
-  { email: 'beatrice@gmail.com', name: 'Sister Beatrice', role: 'choir' as const, isStreaming: false, isMuted: true, handRaised: false },
-  { email: 'caleb@outlook.com', name: 'Brother Caleb', role: 'choir' as const, isStreaming: false, isMuted: true, handRaised: false },
-  { email: 'mary@nbbc.org', name: 'Sister Mary', role: 'deacon' as const, isStreaming: false, isMuted: true, handRaised: false },
-  { email: 'david@yahoo.com', name: 'Brother David', role: 'deacon' as const, isStreaming: false, isMuted: true, handRaised: false },
-  { email: 'sarah@gmail.com', name: 'Sister Sarah', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
-  { email: 'john@outlook.com', name: 'Brother John', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
-  { email: 'chloe@nbbc.org', name: 'Sister Chloe', role: 'visitor' as const, isStreaming: false, isMuted: true, handRaised: false }
+  { email: 'beatrice@gmail.com', name: 'Sister Beatrice', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
+  { email: 'caleb@outlook.com', name: 'Brother Caleb', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
+  { email: 'mary@nbbc.org', name: 'Sister Mary', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false },
+  { email: 'david@yahoo.com', name: 'Brother David', role: 'member' as const, isStreaming: false, isMuted: true, handRaised: false }
 ];
 
 const SIMULATED_CHAT_TEXTS = [
@@ -447,77 +445,6 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
     ? [...members, ...simulatedMembersList.filter(sm => !members.some(m => m.email === sm.email))]
     : members;
 
-  const renderPewMemberCard = (member: MemberStatus) => {
-    const hasVideo = member.isStreaming && remoteStreams[member.email];
-    const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-
-    let badgeText = 'Member';
-    let badgeClass = 'role-badge-member';
-    if (member.role === 'deacon') {
-      badgeText = 'Deacon';
-      badgeClass = 'role-badge-deacon';
-    } else if (member.role === 'choir') {
-      badgeText = 'Choir';
-      badgeClass = 'role-badge-choir';
-    } else if (member.role === 'visitor') {
-      badgeText = 'Visitor';
-      badgeClass = 'role-badge-visitor';
-    }
-
-    return (
-      <div 
-        key={member.email} 
-        className="pew-member-card"
-        style={{
-          border: '1px solid rgba(255,255,255,0.08)'
-        }}
-      >
-        <span className={`role-badge ${badgeClass}`}>
-          {badgeText}
-        </span>
-
-        {hasVideo ? (
-          <video 
-            ref={(el) => {
-              if (el && remoteStreams[member.email]) {
-                el.srcObject = remoteStreams[member.email];
-              }
-            }}
-            autoPlay 
-            playsInline 
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
-          <div className="participant-avatar-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="participant-avatar">{initials}</div>
-            {member.isStreaming && (
-              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Connecting...
-              </span>
-            )}
-          </div>
-        )}
-
-        <span className="participant-name" style={{ fontSize: '0.7rem', padding: '2px 6px', bottom: '4px', left: '4px', background: 'rgba(0,0,0,0.6)', borderRadius: '3px' }}>
-          {member.name}
-        </span>
-
-        <div className="participant-indicators">
-          {member.isMuted && (
-            <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '3px', borderRadius: '50%' }}>
-              <MicOff size={8} color="white" />
-            </div>
-          )}
-          {member.handRaised && (
-            <div style={{ background: 'var(--text-gold)', padding: '3px', borderRadius: '50%' }}>
-              <Hand size={8} color="black" />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   // Combine real and simulated chats
   const allChats = simulationActive 
     ? [...chatMessages, ...simulatedChats].sort((a, b) => a.timestamp.localeCompare(b.timestamp))
@@ -813,13 +740,13 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
         </div>
 
         {/* Congregation Grid */}
-        <div style={{ marginTop: '20px' }}>
+        <div>
           <h3 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', marginBottom: '12px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Users size={20} />
-            Sanctuary Seating Pews ({allMembers.filter(m => m.role !== 'pastor').length})
+            Congregation Camera Feeds ({allMembers.filter(m => m.role === 'member').length})
           </h3>
           
-          {allMembers.filter(m => m.role !== 'pastor').length === 0 ? (
+          {allMembers.filter(m => m.role === 'member').length === 0 ? (
             <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
               No congregation members are currently connected.
               {!simulationActive && (
@@ -829,60 +756,59 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
               )}
             </div>
           ) : (
-            <div className="pew-sanctuary">
-              {/* Choir Loft Row */}
-              <div>
-                <div className="pew-section-label">
-                  <span>🎵 Choir Loft</span>
-                </div>
-                <div className="pew-bench">
-                  {allMembers.filter(m => m.role === 'choir').length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '10px 0' }}>
-                      Choir loft is empty.
-                    </div>
-                  ) : (
-                    <div className="pew-grid-container">
-                      {allMembers.filter(m => m.role === 'choir').map(member => renderPewMemberCard(member))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="participant-grid">
+              {allMembers
+                .filter(m => m.role === 'member')
+                .map((member) => {
+                  const hasVideo = member.isStreaming && remoteStreams[member.email];
+                  const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
-              {/* Deacon Bench Row */}
-              <div>
-                <div className="pew-section-label">
-                  <span>🛡️ Deacon Bench</span>
-                </div>
-                <div className="pew-bench">
-                  {allMembers.filter(m => m.role === 'deacon').length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '10px 0' }}>
-                      Deacon bench is empty.
-                    </div>
-                  ) : (
-                    <div className="pew-grid-container">
-                      {allMembers.filter(m => m.role === 'deacon').map(member => renderPewMemberCard(member))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  return (
+                    <div 
+                      key={member.email} 
+                      className={`participant-card ${member.isStreaming ? 'streaming' : ''}`}
+                    >
+                      {hasVideo ? (
+                        <video 
+                          ref={(el) => {
+                            if (el && remoteStreams[member.email]) {
+                              el.srcObject = remoteStreams[member.email];
+                            }
+                          }}
+                          autoPlay 
+                          playsInline 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div className="participant-avatar-container">
+                          <div className="participant-avatar">{initials}</div>
+                          {member.isStreaming && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              Connecting camera...
+                            </span>
+                          )}
+                        </div>
+                      )}
 
-              {/* Sanctuary Pews Row */}
-              <div>
-                <div className="pew-section-label">
-                  <span>🪑 Sanctuary Pews</span>
-                </div>
-                <div className="pew-bench">
-                  {allMembers.filter(m => m.role === 'member' || m.role === 'visitor').length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.75rem', padding: '10px 0' }}>
-                      General pews are empty.
+                      <span className="participant-name">
+                        {member.name}
+                      </span>
+
+                      <div className="participant-indicators">
+                        {member.isMuted && (
+                          <div style={{ background: 'rgba(239, 68, 68, 0.8)', padding: '4px', borderRadius: '50%' }}>
+                            <MicOff size={10} color="white" />
+                          </div>
+                        )}
+                        {member.handRaised && (
+                          <div style={{ background: 'var(--text-gold)', padding: '4px', borderRadius: '50%' }}>
+                            <Hand size={10} color="black" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="pew-grid-container">
-                      {allMembers.filter(m => m.role === 'member' || m.role === 'visitor').map(member => renderPewMemberCard(member))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  );
+                })}
             </div>
           )}
         </div>
