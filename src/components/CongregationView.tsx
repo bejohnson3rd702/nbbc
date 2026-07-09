@@ -249,6 +249,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
   const [bibleSearchQuery, setBibleSearchQuery] = useState('');
   const [loadingBible, setLoadingBible] = useState(false);
   const [bibleError, setBibleError] = useState('');
+  const [bibleTranslation, setBibleTranslation] = useState('kjv');
 
   const fetchSermons = async () => {
     setLoadingArchive(true);
@@ -293,11 +294,12 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
     }
   };
 
-  const fetchBible = async (reference: string) => {
+  const fetchBible = async (reference: string, translationOverride?: string) => {
     setLoadingBible(true);
     setBibleError('');
     try {
-      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}`);
+      const trans = translationOverride || bibleTranslation;
+      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${trans}`);
       if (!response.ok) {
         throw new Error('Scripture reference not found.');
       }
@@ -310,6 +312,12 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
       setLoadingBible(false);
     }
   };
+
+  useEffect(() => {
+    if (bibleBook && bibleChapter) {
+      fetchBible(`${bibleBook} ${bibleChapter}`);
+    }
+  }, [bibleTranslation]);
 
   const {
     members,
@@ -1240,7 +1248,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
             </h4>
 
             {/* Browse Selectors */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <select 
                 value={bibleBook} 
                 onChange={(e) => {
@@ -1251,7 +1259,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                   fetchBible(`${newBook} 1`);
                 }}
                 className="form-input"
-                style={{ flex: 2, padding: '8px 12px' }}
+                style={{ flex: '2 1 120px', padding: '8px 12px' }}
               >
                 {BIBLE_BOOKS.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
               </select>
@@ -1265,11 +1273,23 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
                   fetchBible(`${bibleBook} ${newCh}`);
                 }}
                 className="form-input"
-                style={{ flex: 1, padding: '8px 12px' }}
+                style={{ flex: '1 1 80px', padding: '8px 12px' }}
               >
                 {Array.from({ length: BIBLE_BOOKS.find(b => b.name === bibleBook)?.chapters || 1 }, (_, i) => i + 1).map(c => (
                   <option key={c} value={c}>Ch {c}</option>
                 ))}
+              </select>
+
+              <select
+                value={bibleTranslation}
+                onChange={(e) => setBibleTranslation(e.target.value)}
+                className="form-input"
+                style={{ flex: '2 1 150px', padding: '8px 12px', borderColor: 'var(--primary-gold)' }}
+              >
+                <option value="kjv">KJV (King James Version)</option>
+                <option value="web">WEB (World English Bible)</option>
+                <option value="bbe">BBE (Basic English Bible)</option>
+                <option value="rvr1960">RVR (Reina Valera 1960 - Spanish)</option>
               </select>
             </div>
 

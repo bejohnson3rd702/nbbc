@@ -112,7 +112,7 @@ const SIMULATED_CHAT_TEXTS = [
 const SIMULATED_EMOJIS = ['🙏', '👏', '❤️', '🙌', '✨'];
 
 export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms' | 'spotlight' | 'admin'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'prayer' | 'giving' | 'sms' | 'spotlight' | 'admin' | 'bible'>('chat');
   const [chatInput, setChatInput] = useState('');
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [prayerInput, setPrayerInput] = useState('');
@@ -126,12 +126,14 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
   const [customSpotlightRef, setCustomSpotlightRef] = useState('');
   const [loadingBible, setLoadingBible] = useState(false);
   const [bibleError, setBibleError] = useState('');
+  const [bibleTranslation, setBibleTranslation] = useState('kjv');
 
-  const fetchBibleVerses = async (reference: string) => {
+  const fetchBibleVerses = async (reference: string, translationOverride?: string) => {
     setLoadingBible(true);
     setBibleError('');
     try {
-      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}`);
+      const trans = translationOverride || bibleTranslation;
+      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=${trans}`);
       if (!response.ok) {
         throw new Error('Scripture reference not found.');
       }
@@ -146,10 +148,16 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
   };
 
   useEffect(() => {
-    if (activeTab === 'spotlight' && spotlightVerses.length === 0) {
+    if ((activeTab === 'spotlight' || activeTab === 'bible') && spotlightVerses.length === 0) {
       fetchBibleVerses(`${spotlightBook} ${spotlightChapter}`);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (spotlightBook && spotlightChapter) {
+      fetchBibleVerses(`${spotlightBook} ${spotlightChapter}`);
+    }
+  }, [bibleTranslation]);
   const [simulatedMembersList, setSimulatedMembersList] = useState<MemberStatus[]>([]);
   const [simulatedChats, setSimulatedChats] = useState<ChatMessage[]>([]);
   const [simulatedReactions, setSimulatedReactions] = useState<{ id: number; emoji: string }[]>([]);
@@ -536,7 +544,7 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
           console.log('✨ Voice Auto-Spotlight found reference:', refKey);
           
           try {
-            const res = await fetch(`https://bible-api.com/${encodeURIComponent(refKey)}`);
+            const res = await fetch(`https://bible-api.com/${encodeURIComponent(refKey)}?translation=${bibleTranslation}`);
             if (res.ok) {
               const resData = await res.json();
               const verseText = resData.text?.trim() || '';
@@ -1245,6 +1253,12 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
             Spotlight
           </button>
           <button 
+            className={`sidebar-tab ${activeTab === 'bible' ? 'active' : ''}`}
+            onClick={() => setActiveTab('bible')}
+          >
+            Bible
+          </button>
+          <button 
             className={`sidebar-tab ${activeTab === 'sms' ? 'active' : ''}`}
             onClick={() => setActiveTab('sms')}
           >
@@ -1840,6 +1854,144 @@ export default function PastorDashboard({ user, onLogout, webrtc }: PastorDashbo
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* Bible Tab */}
+        {activeTab === 'bible' && (
+          <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h4 style={{ color: 'var(--primary-gold)', fontFamily: 'var(--font-serif)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <BookOpen size={18} />
+              Virtual Bible
+            </h4>
+
+            {/* Browse Selectors */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <select 
+                value={spotlightBook} 
+                onChange={(e) => {
+                  const newBook = e.target.value;
+                  setSpotlightBook(newBook);
+                  setSpotlightChapter(1);
+                  fetchBibleVerses(`${newBook} 1`);
+                }}
+                className="form-input"
+                style={{ flex: '2 1 120px', padding: '8px 12px' }}
+              >
+                {BIBLE_BOOKS.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+              </select>
+
+              <select 
+                value={spotlightChapter} 
+                onChange={(e) => {
+                  const newCh = parseInt(e.target.value);
+                  setSpotlightChapter(newCh);
+                  fetchBibleVerses(`${spotlightBook} ${newCh}`);
+                }}
+                className="form-input"
+                style={{ flex: '1 1 80px', padding: '8px 12px' }}
+              >
+                {Array.from({ length: BIBLE_BOOKS.find(b => b.name === spotlightBook)?.chapters || 1 }, (_, i) => i + 1).map(c => (
+                  <option key={c} value={c}>Ch {c}</option>
+                ))}
+              </select>
+
+              <select
+                value={bibleTranslation}
+                onChange={(e) => setBibleTranslation(e.target.value)}
+                className="form-input"
+                style={{ flex: '2 1 150px', padding: '8px 12px', borderColor: 'var(--primary-gold)' }}
+              >
+                <option value="kjv">KJV (King James Version)</option>
+                <option value="web">WEB (World English Bible)</option>
+                <option value="bbe">BBE (Basic English Bible)</option>
+                <option value="rvr1960">RVR (Reina Valera 1960 - Spanish)</option>
+              </select>
+            </div>
+
+            {/* Quick Search */}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!customSpotlightText.trim()) return;
+              fetchBibleVerses(customSpotlightText.trim());
+            }} style={{ display: 'flex', gap: '8px' }}>
+              <input 
+                type="text" 
+                className="form-input" 
+                placeholder="e.g. John 3:16 or Romans 12" 
+                value={customSpotlightText}
+                onChange={(e) => setCustomSpotlightText(e.target.value)}
+                style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+              />
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+                Search
+              </button>
+            </form>
+
+            {/* Content Area */}
+            <div style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '12px', border: '1px solid rgba(255,255,255,0.02)' }}>
+              {loadingBible ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', padding: '20px' }}>
+                  Opening scripture...
+                </div>
+              ) : bibleError ? (
+                <div style={{ color: '#f87171', fontSize: '0.85rem', textAlign: 'center', padding: '10px' }}>
+                  {bibleError}
+                </div>
+              ) : spotlightVerses.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px' }}>
+                  Select a chapter or search above to begin reading.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontFamily: 'Georgia, serif', lineHeight: '1.7', fontSize: '0.95rem', color: '#f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontStyle: 'italic', fontFamily: 'var(--font-sans)', marginBottom: '4px' }}>
+                    💡 Tip: Click on any verse to spotlight it on everyone's screen!
+                  </div>
+                  {spotlightVerses.map((verse) => {
+                    const ref = `${spotlightBook} ${spotlightChapter}:${verse.verse}`;
+                    const isCurrent = activeSpotlight && activeSpotlight.text === verse.text;
+                    return (
+                      <div 
+                        key={verse.verse} 
+                        onClick={() => {
+                          if (isCurrent) {
+                            spotlightScripture('', ''); // Clear
+                          } else {
+                            spotlightScripture(verse.text, ref); // Spotlight
+                          }
+                        }}
+                        style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: '4px', 
+                          borderBottom: '1px solid rgba(255,255,255,0.03)', 
+                          paddingBottom: '10px',
+                          cursor: 'pointer',
+                          padding: isCurrent ? '8px' : '2px',
+                          borderRadius: isCurrent ? '6px' : '0',
+                          background: isCurrent ? 'rgba(226,168,80,0.12)' : 'none',
+                          border: isCurrent ? '1.5px solid var(--primary-gold)' : 'none',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isCurrent) e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isCurrent) e.currentTarget.style.background = 'none';
+                        }}
+                      >
+                        <div>
+                          <span style={{ color: 'var(--primary-gold)', fontWeight: 'bold', marginRight: '8px', fontFamily: 'var(--font-sans)', fontSize: '0.8rem' }}>
+                            {verse.verse}
+                          </span>
+                          {verse.text.trim()}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
