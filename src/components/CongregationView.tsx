@@ -580,7 +580,7 @@ export default function CongregationView({ user, onLogout, webrtc }: Congregatio
 
       {/* Main Sanctuary Feed Area */}
       <div className="main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="dashboard-header">
           <div>
             <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--primary-gold)', fontSize: '1.6rem' }}>
               Virtual Sanctuary
